@@ -1,21 +1,34 @@
 # ✂️ CutGut
 
-[![Version](https://img.shields.io/badge/version-202608230--0--0-blue.svg)](https://github.com/Zeluqe/CutGut/releases/tag/202608230-0-0)
+[![Version](https://img.shields.io/badge/version-202608230--1--0-blue.svg)](https://github.com/Zeluqe/CutGut/releases/tag/202608230-1-0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://www.python.org/)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-Supported-red.svg)](https://ffmpeg.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)]()
 
-[![Download CutGut.exe](https://img.shields.io/badge/Download-CutGut.exe%20(Build%20202608230--0--0)-2563eb?logo=windows&style=for-the-badge)](https://github.com/Zeluqe/CutGut/releases/download/202608230-0-0/CutGut.exe)
+[![Download CutGut.exe](https://img.shields.io/badge/Download-CutGut.exe%20(Build%20202608230--1--0)-2563eb?logo=windows&style=for-the-badge)](https://github.com/Zeluqe/CutGut/releases/download/202608230-1-0/CutGut.exe)
 
 > **High-precision video trimming and smart compression tool tailored for Discord (20 MB free tier, 50 MB / 500 MB Nitro), Messenger, and social uploads.**
 
-CutGut provides frame-accurate video clipping, hardware-accelerated **NVIDIA NVENC** & **AMD AMF** GPU encoding, and 2-pass rate control to ensure your clips fit strictly under upload size caps without visual degradation.
+CutGut provides frame-accurate video clipping, instant lossless stream copy (remuxing), hardware-accelerated **NVIDIA NVENC** & **AMD AMF** GPU encoding, task queue batch processing, and 2-pass rate control.
 
 ---
 
 ## 🌟 Key Features
 
+- ⚡ **Instant Lossless Remuxing (`can_stream_copy`)**:
+  - If a clip or file already fits under the target limit, CutGut automatically copies video/audio streams directly (`-c copy`) in ~0.2 seconds without re-encoding!
+- 📊 **Real-Time Plan Estimation**:
+  - Live bitrate, output resolution, FPS, and ETA calculations displayed dynamically before encoding.
+- ⌨️ **Keyboard Shortcuts & Timeline Handles**:
+  - `I`: Set Start (In point) from playhead.
+  - `O`: Set End (Out point) from playhead.
+  - `Space`: Play / Pause playback.
+  - `←` / `→`: Seek ±1 second (or `Shift + ←/→` for precise ±1 frame seeking).
+- 📋 **Batch Processing & Job Queue (`EncodeJob`)**:
+  - Queue multiple clips/ranges with sequential execution and per-task cancellation in GUI and CLI.
+- 🌐 **Multi-Language (Polski 🇵🇱 / English 🇬🇧)**:
+  - Instant on-the-fly UI language switching persisted across sessions.
 - 🎯 **Target File Size Presets**:
   - **Discord Free (20 MB - Default)**: Targets ~19.60 MB for guaranteed upload safety across decimal and binary limits.
   - **Legacy / Small (10 MB)**: Targets ~9.80 MB for quick sharing and strict email/app limits.
@@ -26,16 +39,14 @@ CutGut provides frame-accurate video clipping, hardware-accelerated **NVIDIA NVE
   - Automatic hardware detection with graceful fallback hierarchy: **NVENC** ➔ **AMF** ➔ **CPU**.
   - CPU fallbacks: Balanced H.264 2-pass (`libx264 slow`), Fast H.264 (`libx264 veryfast`), and Cinematic H.265 (`libx265`).
 - 🎬 **Interactive Video Timeline & Player**:
-  - Frame-accurate clipping (`Set Start` / `Set End`).
-  - **Loop Preview**: Seamlessly loop playback between start and end markers to inspect cuts.
-  - Full **Drag & Drop** support.
+  - Frame-accurate clipping with **Loop Preview** and **Drag & Drop** support.
 - 📉 **Intelligent Downscaling & FPS Adaptation**:
   - Automatically downscales to 720p (<900 kbps) or 480p/30fps (<450 kbps) for long clips to prevent compression artifacts.
 - 🔄 **Automated Verification & Retry Protection**:
   - Automatically verifies final file size; applies an instant 1-pass correction if video exceeds target limits.
 - 💻 **Dual Surface (GUI & CLI)**:
   - Rich **PyQt6 Desktop App** (`gui.py`).
-  - Fast, scriptable **Command Line Interface** (`cli.py`).
+  - Fast, scriptable batch **Command Line Interface** (`cli.py`).
 
 ---
 

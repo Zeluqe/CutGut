@@ -48,20 +48,22 @@ class EncodingWorker(QThread):
     def cancel(self):
         self.cancel_token.cancel()
 
-__version__ = "202608230-0-0"
+__version__ = "202608230-1-0"
 
 TRANSLATIONS = {
     'pl': {
         'title': 'CutGut v{version} - Przycinanie i inteligentna kompresja wideo',
-        'btn_start': '📍 USTAW START',
-        'btn_end': '📍 USTAW KONIEC',
-        'range_initial': 'Wybierz fragment filmu do przycięcia...',
+        'btn_start': '📍 USTAW START (I)',
+        'btn_end': '📍 USTAW KONIEC (O)',
+        'range_initial': 'Wybierz film lub przeciągnij go do okna...',
         'range_text': 'ZAKRES: {start:.2f}s - {end:.2f}s  (Długość: {dur:.2f}s)',
-        'chk_loop': '🔁 Zapętlij podgląd (Loop)',
+        'chk_loop': '🔁 Zapętlij (Loop)',
         'lbl_volume': '🔊 Głośność:',
         'btn_select': '📁 WYBIERZ FILM',
         'btn_compress': '🚀 PRZYTNIJ I KOMPRESUJ',
+        'btn_add_queue': '➕ DO KOLEJKI',
         'btn_cancel': '🛑 ANULUJ',
+        'lbl_queue': '📋 Kolejka zadań ({count}):',
         'presets': [
             '🎯 Discord Free (20 MB)',
             '📦 Legacy / Small (10 MB)',
@@ -91,31 +93,36 @@ TRANSLATIONS = {
             '💨 CPU H.264 (Szybki)',
             '💎 CPU H.265 (Kinowy)'
         ],
-        'ready_status': 'Gotowy. Wybierz film z dysku lub przeciągnij go do okna.',
+        'ready_status': 'Gotowy. Skróty: [I] Start, [O] Koniec, [Spacja] Play/Pause, [←/→] ±1s, [Shift+←/→] ±1 klatka',
         'loaded_status': 'Wczytano: {filename}',
-        'init_status': 'Inicjalizacja kompresji...',
-        'cancel_status': 'Anulowanie zadania...',
+        'init_status': 'Inicjalizacja zadania...',
+        'cancel_status': 'Anulowanie bieżącego zadania...',
         'progress_status': '[{stage}] {percent:.1f}% | Prędkość: {speed}{eta}',
         'done_status': '✅ Gotowe! Zapisano: {filename} ({mb:.2f} MB / {mib:.2f} MiB)',
+        'queue_done_status': '✅ Ukończono całą kolejkę ({count} zadań)!',
         'error_status': '❌ Błąd: {msg}',
         'invalid_range_title': 'Nieprawidłowy zakres',
         'invalid_range_msg': 'Czas końca musi być większy niż czas początku!',
         'ffmpeg_missing_status': '⚠️ Uwaga: Brak FFmpeg. Zainstaluj FFmpeg lub umieść ffmpeg.exe w folderze programu.',
         'dialog_open_title': 'Wybierz film',
         'dialog_open_filter': 'Pliki Wideo (*.mp4 *.mkv *.avi *.mov *.webm *.flv *.ts)',
-        'error_dialog_title': 'Błąd kompresji'
+        'error_dialog_title': 'Błąd kompresji',
+        'estimate_remux': '⚡ Błyskawiczny Remux bezstratny (plik mieści się w limicie, ~0.2s)',
+        'estimate_encode': '📊 Plan: {res} @ {fps:.0f}fps | Bitrate: ~{v_kbps} kbps | Limit: {mb:.1f} MB'
     },
     'en': {
         'title': 'CutGut v{version} - Video Trimming & Smart Compression',
-        'btn_start': '📍 SET START',
-        'btn_end': '📍 SET END',
-        'range_initial': 'Select a video segment to trim...',
+        'btn_start': '📍 SET START (I)',
+        'btn_end': '📍 SET END (O)',
+        'range_initial': 'Select a video from disk or drag & drop here...',
         'range_text': 'RANGE: {start:.2f}s - {end:.2f}s  (Duration: {dur:.2f}s)',
         'chk_loop': '🔁 Loop preview',
         'lbl_volume': '🔊 Volume:',
         'btn_select': '📁 SELECT VIDEO',
         'btn_compress': '🚀 TRIM & COMPRESS',
+        'btn_add_queue': '➕ TO QUEUE',
         'btn_cancel': '🛑 CANCEL',
+        'lbl_queue': '📋 Task Queue ({count}):',
         'presets': [
             '🎯 Discord Free (20 MB)',
             '📦 Legacy / Small (10 MB)',
@@ -145,19 +152,22 @@ TRANSLATIONS = {
             '💨 CPU H.264 (Fast)',
             '💎 CPU H.265 (Cinematic)'
         ],
-        'ready_status': 'Ready. Select a video from disk or drag & drop here.',
+        'ready_status': 'Ready. Shortcuts: [I] Start, [O] End, [Space] Play/Pause, [←/→] ±1s, [Shift+←/→] ±1 frame',
         'loaded_status': 'Loaded: {filename}',
-        'init_status': 'Initializing compression...',
-        'cancel_status': 'Cancelling task...',
+        'init_status': 'Initializing task...',
+        'cancel_status': 'Cancelling active task...',
         'progress_status': '[{stage}] {percent:.1f}% | Speed: {speed}{eta}',
         'done_status': '✅ Done! Saved: {filename} ({mb:.2f} MB / {mib:.2f} MiB)',
+        'queue_done_status': '✅ All queue tasks completed ({count} jobs)!',
         'error_status': '❌ Error: {msg}',
         'invalid_range_title': 'Invalid Range',
         'invalid_range_msg': 'End time must be greater than start time!',
         'ffmpeg_missing_status': '⚠️ Note: FFmpeg missing. Install FFmpeg or place ffmpeg.exe in app folder.',
         'dialog_open_title': 'Select video',
         'dialog_open_filter': 'Video Files (*.mp4 *.mkv *.avi *.mov *.webm *.flv *.ts)',
-        'error_dialog_title': 'Compression Error'
+        'error_dialog_title': 'Compression Error',
+        'estimate_remux': '⚡ Instant Lossless Stream Copy (fits limit directly, ~0.2s)',
+        'estimate_encode': '📊 Plan: {res} @ {fps:.0f}fps | Bitrate: ~{v_kbps} kbps | Limit: {mb:.1f} MB'
     }
 }
 
@@ -170,7 +180,7 @@ class CutGutApp(QMainWindow):
         if self.current_lang not in ('pl', 'en'):
             self.current_lang = 'pl'
 
-        self.setMinimumSize(980, 800)
+        self.setMinimumSize(980, 830)
         self.setAcceptDrops(True)
 
         self.setStyleSheet('''
@@ -214,10 +224,14 @@ class CutGutApp(QMainWindow):
         ''')
 
         self.input_file = ''
+        self.video_info = None
+        self.video_fps = 60.0
         self.start_ms = 0
         self.end_ms = 0
         self.custom_mb = 20.0
         self.worker = None
+        self.queue: list[encoder.EncodeJob] = []
+        self.active_job: Optional[encoder.EncodeJob] = None
 
         # Media Player
         self.mediaPlayer = QMediaPlayer()
@@ -237,12 +251,12 @@ class CutGutApp(QMainWindow):
 
     def init_ui(self):
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(12)
+        main_layout.setContentsMargins(18, 16, 18, 16)
+        main_layout.setSpacing(10)
 
         # 1. Ekran wideo
         self.videoWidget.setStyleSheet('background-color: black; border-radius: 10px; border: 2px solid #1e293b;')
-        self.videoWidget.setMinimumHeight(420)
+        self.videoWidget.setMinimumHeight(400)
         main_layout.addWidget(self.videoWidget)
 
         # 2. Pasek czasu i kontrolki odtwarzacza
@@ -294,41 +308,51 @@ class CutGutApp(QMainWindow):
         player_layout.addLayout(controls_row)
         main_layout.addWidget(player_panel)
 
-        # 3. Panel zakresu przycinania
+        # 3. Panel zakresu przycinania i estymaty
         trim_panel = QWidget()
         trim_panel.setStyleSheet('background-color: #1e293b; border-radius: 10px; border: 1px solid #334155;')
-        trim_layout = QHBoxLayout(trim_panel)
-        trim_layout.setContentsMargins(12, 10, 12, 10)
+        trim_layout = QVBoxLayout(trim_panel)
+        trim_layout.setContentsMargins(12, 8, 12, 8)
+        trim_layout.setSpacing(6)
 
+        trim_btn_row = QHBoxLayout()
         self.btnStart = QPushButton()
         self.btnStart.setStyleSheet('background-color: #059669; min-width: 140px;')
         self.btnStart.clicked.connect(self.set_start)
-        trim_layout.addWidget(self.btnStart)
+        trim_btn_row.addWidget(self.btnStart)
 
         self.lblRange = QLabel()
         self.lblRange.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lblRange.setStyleSheet('font-size: 14px; font-weight: bold; color: #60a5fa;')
-        trim_layout.addWidget(self.lblRange)
+        trim_btn_row.addWidget(self.lblRange)
 
         self.btnEnd = QPushButton()
         self.btnEnd.setStyleSheet('background-color: #dc2626; min-width: 140px;')
         self.btnEnd.clicked.connect(self.set_end)
-        trim_layout.addWidget(self.btnEnd)
+        trim_btn_row.addWidget(self.btnEnd)
+        trim_layout.addLayout(trim_btn_row)
+
+        # Estymata na żywo
+        self.lblEstimate = QLabel()
+        self.lblEstimate.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lblEstimate.setStyleSheet('font-size: 12px; color: #38bdf8; font-weight: 500;')
+        trim_layout.addWidget(self.lblEstimate)
         main_layout.addWidget(trim_panel)
 
         # 4. Wybór limitu, enkodera i przyciski akcji
         bottom_row = QHBoxLayout()
-        bottom_row.setSpacing(10)
+        bottom_row.setSpacing(8)
 
         # Limit preset
         self.limitCombo = QComboBox()
-        self.limitCombo.setFixedWidth(200)
+        self.limitCombo.setFixedWidth(190)
         self.limitCombo.currentIndexChanged.connect(self.on_limit_changed)
         bottom_row.addWidget(self.limitCombo)
 
         # Enkoder
         self.modeCombo = QComboBox()
-        self.modeCombo.setFixedWidth(220)
+        self.modeCombo.setFixedWidth(210)
+        self.modeCombo.currentIndexChanged.connect(self.update_live_estimate)
         bottom_row.addWidget(self.modeCombo)
 
         self.btnSelect = QPushButton()
@@ -336,23 +360,29 @@ class CutGutApp(QMainWindow):
         self.btnSelect.clicked.connect(self.open_file)
         bottom_row.addWidget(self.btnSelect)
 
+        self.btnAddToQueue = QPushButton()
+        self.btnAddToQueue.setStyleSheet('background-color: #0891b2;')
+        self.btnAddToQueue.setEnabled(False)
+        self.btnAddToQueue.clicked.connect(self.add_to_queue)
+        bottom_row.addWidget(self.btnAddToQueue)
+
         self.btnCompress = QPushButton()
-        self.btnCompress.setStyleSheet('background-color: #2563eb; min-width: 200px;')
+        self.btnCompress.setStyleSheet('background-color: #2563eb; min-width: 190px;')
         self.btnCompress.setEnabled(False)
-        self.btnCompress.clicked.connect(self.start_compression)
+        self.btnCompress.clicked.connect(self.start_or_run_queue)
         bottom_row.addWidget(self.btnCompress)
 
         self.btnCancel = QPushButton()
-        self.btnCancel.setStyleSheet('background-color: #991b1b; min-width: 90px;')
+        self.btnCancel.setStyleSheet('background-color: #991b1b; min-width: 80px;')
         self.btnCancel.setEnabled(False)
         self.btnCancel.clicked.connect(self.cancel_compression)
         bottom_row.addWidget(self.btnCancel)
 
         main_layout.addLayout(bottom_row)
 
-        # 5. Pasek postępu i status
+        # 5. Pasek postępu, status i info o kolejce
         self.progBar = QProgressBar()
-        self.progBar.setFixedHeight(22)
+        self.progBar.setFixedHeight(20)
         main_layout.addWidget(self.progBar)
 
         self.statusLabel = QLabel()
@@ -367,6 +397,40 @@ class CutGutApp(QMainWindow):
         self.mediaPlayer.positionChanged.connect(self.position_changed)
         self.mediaPlayer.durationChanged.connect(self.duration_changed)
         self.positionSlider.sliderMoved.connect(self.set_position)
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        modifiers = event.modifiers()
+        
+        # [I] = Start z playhead
+        if key == Qt.Key.Key_I:
+            self.set_start()
+            event.accept()
+        # [O] = Koniec z playhead
+        elif key == Qt.Key.Key_O:
+            self.set_end()
+            event.accept()
+        # [Spacja] = Play / Pauza
+        elif key == Qt.Key.Key_Space:
+            self.play_pause()
+            event.accept()
+        # [←] = -1s lub -1 klatka (z Shiftem)
+        elif key == Qt.Key.Key_Left:
+            step_ms = int(1000.0 / max(self.video_fps, 1.0)) if (modifiers & Qt.KeyboardModifier.ShiftModifier) else 1000
+            self.mediaPlayer.setPosition(max(self.mediaPlayer.position() - step_ms, 0))
+            event.accept()
+        # [→] = +1s lub +1 klatka (z Shiftem)
+        elif key == Qt.Key.Key_Right:
+            step_ms = int(1000.0 / max(self.video_fps, 1.0)) if (modifiers & Qt.KeyboardModifier.ShiftModifier) else 1000
+            self.mediaPlayer.setPosition(min(self.mediaPlayer.position() + step_ms, self.mediaPlayer.duration()))
+            event.accept()
+        # [Escape] = Anuluj
+        elif key == Qt.Key.Key_Escape:
+            if self.worker and self.worker.isRunning():
+                self.cancel_compression()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
 
     def on_lang_changed(self, idx: int):
         self.current_lang = 'pl' if idx == 0 else 'en'
@@ -383,6 +447,7 @@ class CutGutApp(QMainWindow):
         self.chkLoop.setText(self.t('chk_loop'))
         self.lblVol.setText(self.t('lbl_volume'))
         self.btnSelect.setText(self.t('btn_select'))
+        self.btnAddToQueue.setText(self.t('btn_add_queue'))
         self.btnCompress.setText(self.t('btn_compress'))
         self.btnCancel.setText(self.t('btn_cancel'))
 
@@ -420,6 +485,8 @@ class CutGutApp(QMainWindow):
         if cur_mode_idx < self.modeCombo.count():
             self.modeCombo.setCurrentIndex(cur_mode_idx)
         self.modeCombo.blockSignals(False)
+
+        self.update_live_estimate()
 
     def check_ffmpeg_startup(self):
         if not encoder.ensure_ffmpeg():
@@ -469,11 +536,20 @@ class CutGutApp(QMainWindow):
     def load_video(self, file_path: str):
         if file_path and os.path.exists(file_path):
             self.input_file = file_path
+            try:
+                self.video_info = encoder.probe_video(file_path)
+                self.video_fps = self.video_info.fps
+            except Exception:
+                self.video_info = None
+                self.video_fps = 60.0
+
             self.mediaPlayer.setSource(QUrl.fromLocalFile(file_path))
             self.btnCompress.setEnabled(True)
+            self.btnAddToQueue.setEnabled(True)
             self.statusLabel.setText(self.t('loaded_status').format(filename=os.path.basename(file_path)))
             self.mediaPlayer.play()
             self.playBtn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
+            self.update_live_estimate()
 
     def play_pause(self):
         if self.mediaPlayer.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
@@ -523,6 +599,32 @@ class CutGutApp(QMainWindow):
         self.lblRange.setText(
             self.t('range_text').format(start=self.start_ms/1000.0, end=self.end_ms/1000.0, dur=dur_s)
         )
+        self.update_live_estimate()
+
+    def update_live_estimate(self):
+        if not self.input_file or not self.video_info:
+            self.lblEstimate.setText('')
+            return
+
+        start_s = self.start_ms / 1000.0
+        end_s = self.end_ms / 1000.0
+        dur_s = max(end_s - start_s, 0.1)
+        target_mb = self.get_selected_target_mb()
+        mode = self.get_selected_encoder_mode()
+        is_hevc = (mode == 'CPU_HEVC')
+
+        plan = encoder.calculate_plan(self.video_info, start_s, end_s, target_mb, is_hevc, self.input_file)
+        
+        if plan['is_remux']:
+            self.lblEstimate.setText(self.t('estimate_remux'))
+        else:
+            res_str = f"{self.video_info.width}x{plan['out_height']}"
+            self.lblEstimate.setText(self.t('estimate_encode').format(
+                res=res_str,
+                fps=plan['out_fps'],
+                v_kbps=plan['video_kbps'],
+                mb=target_mb
+            ))
 
     def on_limit_changed(self, idx: int):
         if idx == 4:
@@ -535,6 +637,7 @@ class CutGutApp(QMainWindow):
                 self.limitCombo.setItemText(4, self.t('custom_preset_label').format(val=val))
             else:
                 self.limitCombo.setCurrentIndex(0)
+        self.update_live_estimate()
 
     def get_selected_target_mb(self) -> float:
         idx = self.limitCombo.currentIndex()
@@ -564,36 +667,68 @@ class CutGutApp(QMainWindow):
             elif idx == 2: return 'CPU_HEVC'
         return 'CPU_BALANCED'
 
-    def start_compression(self):
+    def add_to_queue(self):
         start_s = self.start_ms / 1000.0
         end_s = self.end_ms / 1000.0
-        dur_s = end_s - start_s
-
-        if dur_s <= 0.1:
+        if (end_s - start_s) <= 0.1:
             QMessageBox.warning(self, self.t('invalid_range_title'), self.t('invalid_range_msg'))
             return
 
-        target_mb = self.get_selected_target_mb()
-        mode = self.get_selected_encoder_mode()
-
         out_dir = os.path.join(encoder.get_base_dir(), 'outputs')
         os.makedirs(out_dir, exist_ok=True)
-        unique_id = int(time.time())
+        unique_id = int(time.time() * 1000)
         output_file = os.path.join(out_dir, f'CutGut_{unique_id}.mp4')
+
+        job = encoder.EncodeJob(
+            job_id=str(unique_id),
+            input_path=self.input_file,
+            output_path=output_file,
+            start_s=start_s,
+            end_s=end_s,
+            target_mb=self.get_selected_target_mb(),
+            preset_mode=self.get_selected_encoder_mode()
+        )
+        self.queue.append(job)
+        self.statusLabel.setText(f"Dodano do kolejki: {os.path.basename(self.input_file)} ({len(self.queue)} w kolejce)")
+
+    def start_or_run_queue(self):
+        if not self.queue:
+            # Dodaj bieżący klip jako pojedyncze zadanie
+            self.add_to_queue()
+
+        if self.queue and (self.worker is None or not self.worker.isRunning()):
+            self.process_next_job()
+
+    def process_next_job(self):
+        pending_jobs = [j for j in self.queue if j.status == 'pending']
+        if not pending_jobs:
+            self.btnCompress.setEnabled(True)
+            self.btnSelect.setEnabled(True)
+            self.btnAddToQueue.setEnabled(True)
+            self.btnCancel.setEnabled(False)
+            self.active_job = None
+            self.statusLabel.setText(self.t('queue_done_status').format(count=len(self.queue)))
+            self.queue.clear()
+            return
+
+        job = pending_jobs[0]
+        job.status = 'running'
+        self.active_job = job
 
         self.btnCompress.setEnabled(False)
         self.btnSelect.setEnabled(False)
+        self.btnAddToQueue.setEnabled(False)
         self.btnCancel.setEnabled(True)
         self.progBar.setValue(0)
         self.statusLabel.setText(self.t('init_status'))
 
         self.worker = EncodingWorker(
-            input_path=self.input_file,
-            output_path=output_file,
-            start_s=start_s,
-            end_s=end_s,
-            target_mb=target_mb,
-            mode=mode
+            input_path=job.input_path,
+            output_path=job.output_path,
+            start_s=job.start_s,
+            end_s=job.end_s,
+            target_mb=job.target_mb,
+            mode=job.preset_mode
         )
         self.worker.progress_signal.connect(self.on_worker_progress)
         self.worker.finished_signal.connect(self.on_worker_finished)
@@ -603,6 +738,8 @@ class CutGutApp(QMainWindow):
     def cancel_compression(self):
         if self.worker and self.worker.isRunning():
             self.statusLabel.setText(self.t('cancel_status'))
+            if self.active_job:
+                self.active_job.status = 'cancelled'
             self.worker.cancel()
 
     def on_worker_progress(self, p: encoder.ProgressUpdate):
@@ -613,11 +750,11 @@ class CutGutApp(QMainWindow):
         ))
 
     def on_worker_finished(self, out_path: str, size_bytes: int):
-        self.btnCompress.setEnabled(True)
-        self.btnSelect.setEnabled(True)
-        self.btnCancel.setEnabled(False)
-        self.progBar.setValue(100)
+        if self.active_job:
+            self.active_job.status = 'finished'
+            self.active_job.result_size = size_bytes
 
+        self.progBar.setValue(100)
         mb_val = size_bytes / 1000000.0
         mib_val = size_bytes / (1024.0 * 1024.0)
         self.statusLabel.setText(self.t('done_status').format(
@@ -628,13 +765,20 @@ class CutGutApp(QMainWindow):
         if os.path.exists(out_dir):
             os.startfile(out_dir)
 
+        # Przejdz do kolejnego zadania w kolejce
+        self.process_next_job()
+
     def on_worker_error(self, err_msg: str):
-        self.btnCompress.setEnabled(True)
-        self.btnSelect.setEnabled(True)
-        self.btnCancel.setEnabled(False)
+        if self.active_job:
+            self.active_job.status = 'error'
+            self.active_job.error_message = err_msg
+
         self.progBar.setValue(0)
         self.statusLabel.setText(self.t('error_status').format(msg=err_msg))
         QMessageBox.critical(self, self.t('error_dialog_title'), err_msg)
+
+        # Kontynuuj kolejne zadania w kolejce
+        self.process_next_job()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

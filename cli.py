@@ -12,7 +12,7 @@ if hasattr(sys.stderr, 'reconfigure'):
 
 import encoder
 
-__version__ = "202608230-0-0"
+__version__ = "202608230-1-0"
 
 def parse_target_mb(val: str) -> float:
     v = val.lower().replace('mb', '').replace('m', '').strip()
@@ -26,7 +26,7 @@ def main():
         description=f'CutGut CLI v{__version__} - Smart video trimming and 2-pass compression tool (Discord 20MB/10MB/50MB).'
     )
     parser.add_argument('-v', '--version', action='version', version=f'%(prog)s {__version__}')
-    parser.add_argument('input', nargs='?', help='Sciezka do pliku wideo')
+    parser.add_argument('inputs', nargs='+', help='Sciezka lub sciezki do plikow wideo')
     parser.add_argument('-s', '--start', type=float, default=0.0, help='Czas poczatku w sekundach (domyslnie 0.0)')
     parser.add_argument('-e', '--end', type=float, default=None, help='Czas konca w sekundach (domyslnie calosc)')
     parser.add_argument('-t', '--target', default='20mb', help='Docelowy limit rozmiaru: 20mb (domyslnie), 10mb, 50mb, 500mb lub liczba MB')
@@ -36,30 +36,10 @@ def main():
         default=None,
         help='Wybierz enkoder: nvenc (NVIDIA GPU HQ), nvenc_fast, amf (AMD GPU HQ), amf_fast, cpu (libx264 balanced), cpu_fast, hevc (libx265)'
     )
-    parser.add_argument('-o', '--output', default=None, help='Sciezka do pliku wyjsciowego')
+    parser.add_argument('-o', '--output', default=None, help='Sciezka do pliku wyjsciowego (dla pojedynczego pliku)')
 
     args = parser.parse_args()
 
-    if not os.path.exists(args.input):
-        print(f'Blad: Plik nie istnieje: {args.input}', file=sys.stderr)
-        sys.exit(1)
-
-    print(f'Analiza pliku: {args.input}...')
-    try:
-        info = encoder.probe_video(args.input)
-    except Exception as e:
-        print(f'Blad odczytu wideo: {e}', file=sys.stderr)
-        sys.exit(1)
-
-    start_s = max(args.start, 0.0)
-    end_s = args.end if args.end is not None else info.duration
-    
-    if end_s <= start_s:
-        print(f'Blad: Czas konca ({end_s}s) musi byc wiekszy niz poczatek ({start_s}s)!', file=sys.stderr)
-        sys.exit(1)
-
-    target_mb = parse_target_mb(args.target)
-    
     # Mapowanie wyboru enkodera
     enc_map = {
         'nvenc': 'NVENC_HQ',
@@ -76,39 +56,86 @@ def main():
     else:
         preset_mode = encoder.get_best_available_encoder()
 
-    if not args.output:
-        out_dir = os.path.join(encoder.get_base_dir(), 'outputs')
-        os.makedirs(out_dir, exist_ok=True)
-        args.output = os.path.join(out_dir, f'CutGut_{int(time.time())}.mp4')
+    target_mb = parse_target_mb(args.target)
+    out_dir = os.path.join(encoder.get_base_dir(), 'outputs')
+    os.makedirs(out_dir, exist_ok=True)
 
-    print(f'Parametry: Zakres: {start_s:.2f}s - {end_s:.2f}s (Dlugosc: {end_s-start_s:.2f}s)')
-    print(f'Limit: {target_mb:.1f} MB | Enkoder: {preset_mode}')
-    print(f'Zapis do: {args.output}')
+    # Budowanie kolejki EncodeJob
+    jobs: list[encoder.EncodeJob] = []
+    for idx, inp in enumerate(args.inputs):
+        if not os.path.exists(inp):
+            print(f'Pominieto (brak pliku): {inp}', file=sys.stderr)
+            continue
+            
+        try:
+            info = encoder.probe_video(inp)
+        except Exception as e:
+            print(f'Blad odczytu {inp}: {e}', file=sys.stderr)
+            continue
 
-    def on_progress(p: encoder.ProgressUpdate):
-        bar_len = 30
-        filled = int(bar_len * p.percent / 100.0)
-        bar = '=' * filled + '-' * (bar_len - filled)
-        sys.stdout.write(f'\r[{p.stage}] [{bar}] {p.percent:5.1f}% | Speed: {p.speed:>5} | ETA: {p.eta_s:4.1f}s ')
-        sys.stdout.flush()
+        start_s = max(args.start, 0.0)
+        end_s = args.end if args.end is not None else info.duration
+        
+        if end_s <= start_s:
+            print(f'Pominieto {inp}: czas konca ({end_s}s) <= poczatek ({start_s}s)', file=sys.stderr)
+            continue
 
-    try:
-        res = encoder.encode_video(
-            input_path=args.input,
-            output_path=args.output,
+        if args.output and len(args.inputs) == 1:
+            out_file = args.output
+        else:
+            base_name = os.path.splitext(os.path.basename(inp))[0]
+            out_file = os.path.join(out_dir, f'CutGut_{base_name}_{int(time.time())}_{idx+1}.mp4')
+
+        job = encoder.EncodeJob(
+            job_id=str(idx + 1),
+            input_path=inp,
+            output_path=out_file,
             start_s=start_s,
             end_s=end_s,
             target_mb=target_mb,
-            preset_mode=preset_mode,
-            progress_callback=on_progress
+            preset_mode=preset_mode
         )
-        print('\n')
-        final_size = os.path.getsize(res)
-        print(f'Sukces! Gotowy plik: {res}')
-        print(f'Rozmiar: {final_size} bajtow ({final_size / (1024*1024):.2f} MiB / {final_size / 1000000:.2f} MB)')
-    except Exception as e:
-        print(f'\nBlad kompresji: {e}', file=sys.stderr)
+        jobs.append(job)
+
+    if not jobs:
+        print('Brak prawidlowych zadan do przetworzenia.', file=sys.stderr)
         sys.exit(1)
+
+    print(f'=== CutGut CLI v{__version__} | Kolejka zadan: {len(jobs)} ===')
+    print(f'Limit: {target_mb:.1f} MB | Enkoder: {preset_mode}\n')
+
+    def on_progress(p: encoder.ProgressUpdate):
+        bar_len = 25
+        filled = int(bar_len * p.percent / 100.0)
+        bar = '=' * filled + '-' * (bar_len - filled)
+        sys.stdout.write(f'\r  [{p.stage[:20]}] [{bar}] {p.percent:5.1f}% | {p.speed:>5} | ETA: {p.eta_s:4.1f}s ')
+        sys.stdout.flush()
+
+    for idx, job in enumerate(jobs, 1):
+        print(f'[{idx}/{len(jobs)}] Przetwarzanie: {os.path.basename(job.input_path)} ({job.start_s:.2f}s - {job.end_s:.2f}s)')
+        try:
+            res = encoder.encode_video(
+                input_path=job.input_path,
+                output_path=job.output_path,
+                start_s=job.start_s,
+                end_s=job.end_s,
+                target_mb=job.target_mb,
+                preset_mode=job.preset_mode,
+                progress_callback=on_progress
+            )
+            print('\n')
+            final_size = os.path.getsize(res)
+            job.status = 'finished'
+            job.result_size = final_size
+            print(f'  -> Gotowe: {res} ({final_size / 1000000:.2f} MB / {final_size / (1024*1024):.2f} MiB)\n')
+        except Exception as e:
+            print(f'\n  -> Blad: {e}\n', file=sys.stderr)
+            job.status = 'error'
+            job.error_message = str(e)
+
+    print('=== Podsumowanie kolejki ===')
+    success_count = sum(1 for j in jobs if j.status == 'finished')
+    print(f'Ukonczono pomyslnie: {success_count}/{len(jobs)}')
 
 if __name__ == '__main__':
     main()

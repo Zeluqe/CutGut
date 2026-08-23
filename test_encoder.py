@@ -57,6 +57,27 @@ class TestEncoderCalculations(unittest.TestCase):
     def test_best_encoder_selection(self):
         best = encoder.get_best_available_encoder()
         self.assertIn(best, ['NVENC_HQ', 'AMF_HQ', 'CPU_BALANCED'])
+    def test_encode_job_creation(self):
+        job = encoder.EncodeJob(
+            job_id='1',
+            input_path='test.mp4',
+            output_path='out.mp4',
+            start_s=0.0,
+            end_s=10.0,
+            target_mb=20.0,
+            preset_mode='NVENC_HQ'
+        )
+        self.assertEqual(job.status, 'pending')
+        self.assertEqual(job.progress_pct, 0.0)
+
+    def test_can_stream_copy_estimation(self):
+        # Wideo 60s o bitrate 1 Mbps (125 KB/s) -> wycinek 10s to ~1.25 MB, mieści się w limicie 20 MB
+        v_info = encoder.VideoInfo(
+            duration=60.0, width=1920, height=1080, fps=60.0,
+            bitrate=1000000, codec='h264', audio_codec='aac'
+        )
+        # Przy braku istniejacego pliku na dysku zwraca False bezpiecznie
+        self.assertFalse(encoder.can_stream_copy(v_info, 'non_existent_file.mp4', 0.0, 10.0, 20.0))
 
 if __name__ == '__main__':
     unittest.main()

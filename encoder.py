@@ -11,7 +11,7 @@ import functools
 from dataclasses import dataclass
 from typing import Optional, Callable
 
-__version__ = "202608230-0-0"
+__version__ = "202608230-1-0"
 
 CREATE_NO_WINDOW = 0x08000000 if os.name == 'nt' else 0
 
@@ -24,6 +24,20 @@ class VideoInfo:
     bitrate: int
     codec: str
     audio_codec: Optional[str]
+
+@dataclass
+class EncodeJob:
+    job_id: str
+    input_path: str
+    output_path: str
+    start_s: float
+    end_s: float
+    target_mb: float
+    preset_mode: str
+    status: str = "pending"  # pending, running, finished, error, cancelled
+    progress_pct: float = 0.0
+    result_size: int = 0
+    error_message: str = ""
 
 @dataclass
 class ProgressUpdate:
@@ -244,31 +258,63 @@ def calculate_target_bytes(target_mb: float) -> int:
     decimal_limit = 0.98 * target_mb * 1000 * 1000
     return int(min(binary_limit, decimal_limit))
 
-def calculate_plan(video_info: VideoInfo, start_s: float, end_s: float, target_mb: float, is_hevc: bool = False):
+def can_stream_copy(video_info: VideoInfo, input_path: str, start_s: float, end_s: float, target_mb: float) -> bool:
+    target_bytes = calculate_target_bytes(target_mb)
+    if not input_path or not os.path.exists(input_path):
+        return False
+        
+    total_size = os.path.getsize(input_path)
+    dur_s = max(end_s - start_s, 0.1)
+    
+    # 1. Caly plik
+    if start_s <= 0.05 and end_s >= (video_info.duration - 0.05):
+        return total_size <= target_bytes
+        
+    # 2. Wycinek pliku (estymata wagi z marginesem 5%)
+    if video_info.duration > 0 and total_size > 0:
+        est_bytes = int((dur_s / max(video_info.duration, 0.1)) * total_size * 1.05)
+        return est_bytes <= target_bytes
+    elif video_info.bitrate > 0:
+        est_bytes = int((dur_s * video_info.bitrate / 8.0) * 1.05)
+        return est_bytes <= target_bytes
+        
+    return False
+
+def calculate_plan(video_info: VideoInfo, start_s: float, end_s: float, target_mb: float, is_hevc: bool = False, input_path: str = ''):
     dur_s = max(end_s - start_s, 0.1)
     
     # 1. Oblicz maksymalny dozwolony rozmiar oraz bezpieczny cel bajtowy
     target_bytes = calculate_target_bytes(target_mb)
     
-    # 2. Narzut audio i kontenera
+    # 2. Sprawdz czy mozliwy jest bezstratny i natychmiastowy Remux (Stream Copy)
+    is_remux = can_stream_copy(video_info, input_path, start_s, end_s, target_mb) if input_path else False
+    
+    # 3. Narzut audio i kontenera
     audio_bps = 96000 if is_hevc else 128000
     overhead_bytes = 40000 + int(dur_s * 600)
     
     net_video_bytes = max(target_bytes - int(audio_bps * dur_s / 8) - overhead_bytes, 1000)
     video_kbps = max(int((net_video_bytes * 8 / dur_s) / 1000), 50)
     
-    # 3. Inteligentne skalowanie i klatkaz
+    # 4. Inteligentne skalowanie i klatkaz
     filters = []
+    out_height = video_info.height
+    out_fps = video_info.fps
+    
     if video_kbps < 450:
         if video_info.height > 480:
             filters.append('scale=-2:480')
+            out_height = 480
         if video_info.fps > 30:
             filters.append('fps=30')
+            out_fps = 30.0
     elif video_kbps < 900:
         if video_info.height > 720:
             filters.append('scale=-2:720')
+            out_height = 720
         if video_info.fps > 45:
             filters.append('fps=30')
+            out_fps = 30.0
             
     filter_str = ','.join(filters) if filters else None
     
@@ -277,7 +323,10 @@ def calculate_plan(video_info: VideoInfo, start_s: float, end_s: float, target_m
         'target_bytes': target_bytes,
         'video_kbps': video_kbps,
         'audio_kbps': int(audio_bps / 1000),
-        'filter_str': filter_str
+        'filter_str': filter_str,
+        'is_remux': is_remux,
+        'out_height': out_height,
+        'out_fps': out_fps
     }
 
 def encode_video(
@@ -306,12 +355,60 @@ def encode_video(
     elif preset_mode in ('AMF_HQ', 'AMF_FAST') and not check_amf_support():
         preset_mode = 'NVENC_HQ' if check_nvenc_support() else 'CPU_BALANCED'
 
-    plan = calculate_plan(video_info, start_s, end_s, target_mb, is_hevc)
+    plan = calculate_plan(video_info, start_s, end_s, target_mb, is_hevc, input_path)
     dur_s = plan['duration_s']
     v_kbps = plan['video_kbps']
     a_kbps = plan['audio_kbps']
     filter_str = plan['filter_str']
+    max_allowed = plan['target_bytes']
+    ffmpeg_bin = get_ffmpeg_path()
     
+    # 0. Szybka sciezka Remux (Stream Copy), jesli sie miesci
+    if plan['is_remux']:
+        try:
+            if progress_callback:
+                progress_callback(ProgressUpdate(
+                    stage='Błyskawiczny Remux (Kopiowanie)',
+                    percent=30.0,
+                    speed='Direct',
+                    fps=0.0,
+                    eta_s=0.5,
+                    elapsed_s=0.1
+                ))
+            
+            cmd_remux = [
+                ffmpeg_bin, '-y', '-hide_banner',
+                '-ss', str(start_s),
+                '-to', str(end_s),
+                '-i', input_path,
+                '-c', 'copy',
+                '-movflags', '+faststart',
+                output_path
+            ]
+            res = subprocess.run(cmd_remux, capture_output=True, creationflags=CREATE_NO_WINDOW)
+            
+            if res.returncode == 0 and os.path.exists(output_path):
+                remux_size = os.path.getsize(output_path)
+                if 1000 < remux_size <= max_allowed:
+                    if progress_callback:
+                        progress_callback(ProgressUpdate(
+                            stage='Ukończono',
+                            percent=100.0,
+                            speed='Direct',
+                            fps=0.0,
+                            eta_s=0.0,
+                            elapsed_s=0.2
+                        ))
+                    return output_path
+            # Jesli remux przekroczyl limit lub zawiodl - usun niepelny plik i przejdz do kompresji
+            if os.path.exists(output_path):
+                try: os.remove(output_path)
+                except Exception: pass
+        except Exception:
+            if os.path.exists(output_path):
+                try: os.remove(output_path)
+                except Exception: pass
+
     unique_id = int(time.time() * 1000)
     base_dir = get_base_dir()
     stats_file = os.path.join(base_dir, f'ffmpeg2pass_{unique_id}')
@@ -320,7 +417,6 @@ def encode_video(
     # Klatkowa dokladnosc: -i przed -ss / -to
     common_args = ['-i', input_path, '-ss', str(start_s), '-to', str(end_s)]
     vf_args = ['-vf', filter_str] if filter_str else []
-    ffmpeg_bin = get_ffmpeg_path()
     
     try:
         if preset_mode in ('NVENC_HQ', 'NVENC_FAST'):
