@@ -44,12 +44,7 @@ class ToastNotification(QFrame):
 
         self.timer = QTimer(self)
         self.timer.setSingleShot(True)
-        self.timer.timeout.connect(self.hide_toast)
-
-        self.opacity_effect = QGraphicsOpacityEffect(self)
-        self.setGraphicsEffect(self.opacity_effect)
-        self.anim = QPropertyAnimation(self.opacity_effect, b"opacity")
-        self.anim.setDuration(250)
+        self.timer.timeout.connect(self.hide)
 
         self.hide()
 
@@ -60,24 +55,15 @@ class ToastNotification(QFrame):
 
         if self.parentWidget():
             parent_w = self.parentWidget().width()
-            self.move(parent_w - self.width() - 20, 20)
+            self.move(parent_w - self.width() - 25, 20)
 
         self.show()
         self.raise_()
-
-        self.anim.stop()
-        self.anim.setStartValue(0.0)
-        self.anim.setEndValue(1.0)
-        self.anim.start()
-
         self.timer.start(duration_ms)
 
     def hide_toast(self):
-        self.anim.stop()
-        self.anim.setStartValue(1.0)
-        self.anim.setEndValue(0.0)
-        self.anim.finished.connect(self.hide)
-        self.anim.start()
+        self.hide()
+
 
 class QualityBadge(QFrame):
     def __init__(self, parent=None):

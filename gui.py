@@ -24,7 +24,7 @@ from ui.widgets import FluentCard, ToastNotification, QualityBadge, HelpShortcut
 from ui.settings_dialog import FluentSettingsDialog
 from ui.queue_drawer import QueueDrawerWidget
 
-__version__ = "202608240-6-0"
+__version__ = "202608240-6-1"
 
 TRANSLATIONS = {
     'pl': {
@@ -283,9 +283,8 @@ class CutGutApp(QMainWindow):
         self.mediaPlayer.setAudioOutput(self.audioOutput)
         self.audioOutput.setVolume(0.7)
 
-        # Apply Fluent Stylesheet & Windows 11 DWM theme
+        # Apply Fluent Stylesheet
         self.setStyleSheet(get_fluent_stylesheet(is_dark=True))
-        apply_windows_theme(self, is_dark=True)
 
         self.init_ui()
         self.retranslate_ui()
@@ -353,7 +352,7 @@ class CutGutApp(QMainWindow):
         self.cropCanvas.setMinimumHeight(370)
         player_container_layout.addWidget(self.cropCanvas, 1)
 
-        self.toast = ToastNotification(self.cropCanvas)
+        self.toast = ToastNotification(self)
 
         main_layout.addWidget(player_container, 1)
 
@@ -1331,6 +1330,18 @@ class CutGutApp(QMainWindow):
         self.update_queue_table()
         QMessageBox.critical(self, "Błąd kompresji", err_msg)
         self.process_next_job()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        try:
+            apply_windows_theme(self, is_dark=True)
+        except Exception:
+            pass
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, 'toast') and self.toast.isVisible():
+            self.toast.move(self.width() - self.toast.width() - 30, 25)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
