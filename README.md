@@ -5,42 +5,33 @@
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-Supported-red.svg)](https://ffmpeg.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)]()
 
-[![Download CutGut.exe](https://img.shields.io/badge/Download-CutGut.exe%20(11.9%20MB)-blue?logo=windows&style=for-the-badge)](https://github.com/Zeluqe/CutGut/releases/download/v2.0.0/CutGut.exe)
+> **High-precision video trimming and smart compression tool tailored for Discord (20 MB free tier, 50 MB / 500 MB Nitro), Messenger, and social uploads.**
 
-
-> **Smart, high-precision video trimming and 2-pass compression tool designed to hit exact file size limits (under 10 MB and 20 MB) for Discord, Messenger, Email, and social platforms.**
-
-CutGut automatically calculates exact 2-pass video and audio bitrates using **H.264** or **H.265 (HEVC)** codecs, ensuring maximum visual clarity while keeping files safely below strict upload caps (e.g. **~9.95 MB** or **~19.95 MB** as reported by Windows File Explorer).
+CutGut provides frame-accurate video clipping, hardware-accelerated **NVIDIA NVENC** encoding, and 2-pass rate control to ensure your clips fit strictly under upload size caps without visual degradation.
 
 ---
 
 ## 🌟 Key Features
 
-- 🎯 **Target File Size Modes**:
-  - **< 10 MB Limit (Default)**: Accurately targets **~9.95 MB** (perfect for Discord free tier and messaging apps).
-  - **< 20 MB Limit**: Accurately targets **~19.95 MB** for longer clips and higher quality preservation.
-- 🚀 **Three Encoding Presets**:
-  - **Fast (H.264 Fast)**: High-speed export while respecting file limits.
-  - **Balanced (H.264 Slow)**: Enhanced sharpness and motion stability.
-  - **Cinematic (H.265 Ultra)**: Maximum compression efficiency with HEVC for high-motion gameplay clips.
-- 🎬 **Interactive Video Timeline**:
-  - Live video preview with playback controls and scrub bar.
-  - Quick **Set Start** and **Set End** boundary markers.
-  - Full **Drag & Drop** support (drop any video file directly into the app window).
-- 🧹 **Automatic Workspace Cleanup**:
-  - Auto-removes temporary multi-pass statistics and log files.
-  - Optional prompt to free up storage by deleting the heavy raw input file after export.
-  - Auto-opens the outputs/ folder upon completion.
-
----
-
-## 🖥️ Available App Editions
-
-| Edition | File | Description |
-| :--- | :--- | :--- |
-| **Desktop Pro** | [gui.py](gui.py) | Full-featured PyQt6 desktop application with embedded media player. |
-| **Desktop Lite** | [gui_mini.py](gui_mini.py) | Ultra-lightweight edition (<12 MB) with auto-downloader for FFmpeg. |
-| **Web Panel** | [pp.py](app.py) | Modern browser-based UI powered by Gradio. |
+- 🎯 **Target File Size Presets**:
+  - **Discord Free (20 MB - Default)**: Targets ~19.60 MB for guaranteed upload safety across decimal and binary limits.
+  - **Legacy / Small (10 MB)**: Targets ~9.80 MB for quick sharing and strict email/app limits.
+  - **Nitro Basic (50 MB)** & **Nitro (500 MB)**: High-bitrate options for longer gaming highlights.
+  - **Custom Size (MB)**: Specify any arbitrary target size.
+- ⚡ **NVIDIA NVENC Hardware Acceleration**:
+  - Blazing-fast GPU encoding for NVIDIA GeForce / RTX graphics cards with multi-pass rate control.
+  - CPU fallbacks: Balanced H.264 2-pass (`libx264 slow`), Fast H.264 (`libx264 veryfast`), and Cinematic H.265 (`libx265`).
+- 🎬 **Interactive Video Timeline & Player**:
+  - Frame-accurate clipping (`Set Start` / `Set End`).
+  - **Loop Preview**: Seamlessly loop playback between start and end markers to inspect cuts.
+  - Full **Drag & Drop** support.
+- 📉 **Intelligent Downscaling & FPS Adaptation**:
+  - Automatically downscales to 720p (<900 kbps) or 480p/30fps (<450 kbps) for long clips to prevent compression artifacts.
+- 🔄 **Automated Verification & Retry Protection**:
+  - Automatically verifies final file size; applies an instant 1-pass correction if video exceeds target limits.
+- 💻 **Dual Surface (GUI & CLI)**:
+  - Rich **PyQt6 Desktop App** (`gui.py`).
+  - Fast, scriptable **Command Line Interface** (`cli.py`).
 
 ---
 
@@ -48,51 +39,57 @@ CutGut automatically calculates exact 2-pass video and audio bitrates using **H.
 
 ### Prerequisites
 - **Python 3.10+**
-- **[FFmpeg](https://ffmpeg.org/)** (installed and added to system PATH or placed in the application directory).
+- **[FFmpeg](https://ffmpeg.org/)** (installed and added to PATH, or placed in the application folder).
 
 ### 1. Clone the repository
-`ash
+```bash
 git clone https://github.com/Zeluqe/CutGut.git
 cd CutGut
-`
+```
 
 ### 2. Set up virtual environment & install dependencies
-`ash
+```bash
 python -m venv venv
 venv\Scripts\activate   # On Windows
 pip install -r requirements.txt
-`
+```
 
-### 3. Run the application
-- **Desktop GUI (PyQt6)**:
-  `ash
-  python gui.py
-  `
-  *(Or double-click Uruchom_CutGut.bat)*
-
-- **Lightweight Desktop GUI**:
-  `ash
-  python gui_mini.py
-  `
-
-- **Web Browser UI**:
-  `ash
-  python app.py
-  `
+### 3. Run Desktop GUI
+```bash
+python gui.py
+```
+*(Or double-click `Uruchom_CutGut.bat`)*
 
 ---
 
-## 📦 Building a Portable Standalone Executable
+## 💻 CLI Usage
 
-To generate a standalone .exe that does not require Python:
+CutGut includes a standalone CLI tool for automated batch processing:
 
-`ash
-# Build Desktop Pro (PyQt6)
-pyinstaller --noconfirm --onedir --windowed --name CutGut gui.py
+```bash
+# Basic trim to Discord 20MB limit using NVIDIA GPU
+python cli.py input.mp4 --start 10.0 --end 35.0 --target 20mb
 
-# Build Ultra-Light Edition
-pyinstaller --noconfirm --onefile --windowed --name CutGut_Lite gui_mini.py
-`
+# Specify custom size, CPU encoder, and output path
+python cli.py gameplay.mp4 -s 0 -e 60 --target 10mb --encoder cpu --output clip.mp4
+```
+
+### Options:
+- `-s, --start`: Start timestamp in seconds (default: `0.0`).
+- `-e, --end`: End timestamp in seconds (default: full length).
+- `-t, --target`: Target limit (`20mb`, `10mb`, `50mb`, `500mb`, or number in MB).
+- `--encoder`: `nvenc` (default if GPU available), `nvenc_fast`, `cpu`, `cpu_fast`, `hevc`.
+- `-o, --output`: Destination file path.
+
+---
+
+## 🧪 Running Unit Tests
+
+To verify algorithmic calculations and downscaling rules:
+
+```bash
+python test_encoder.py
+```
 
 ---
 
