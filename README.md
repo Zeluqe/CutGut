@@ -1,32 +1,34 @@
 # ✂️ CutGut
 
-[![Version](https://img.shields.io/badge/version-202608230--1--1-blue.svg)](https://github.com/Zeluqe/CutGut/releases/tag/202608230-1-1)
+[![Version](https://img.shields.io/badge/version-202608230--2--0-blue.svg)](https://github.com/Zeluqe/CutGut/releases/tag/202608230-2-0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://www.python.org/)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-Supported-red.svg)](https://ffmpeg.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)]()
 
-[![Download CutGut.exe](https://img.shields.io/badge/Download-CutGut.exe%20(Build%20202608230--1--1)-2563eb?logo=windows&style=for-the-badge)](https://github.com/Zeluqe/CutGut/releases/download/202608230-1-1/CutGut.exe)
+[![Download CutGut.exe](https://img.shields.io/badge/Download-CutGut.exe%20(Build%20202608230--2--0)-2563eb?logo=windows&style=for-the-badge)](https://github.com/Zeluqe/CutGut/releases/download/202608230-2-0/CutGut.exe)
 
 > **High-precision video trimming and smart compression tool tailored for Discord (20 MB free tier, 50 MB / 500 MB Nitro), Messenger, and social uploads.**
 
-CutGut provides frame-accurate video clipping, instant lossless stream copy (remuxing), hardware-accelerated **NVIDIA NVENC** & **AMD AMF** GPU encoding, task queue batch processing, and 2-pass rate control.
+CutGut provides frame-accurate video clipping, real-time quality grading (bppf), instant lossless remuxing, safe source recycling policies, hardware-accelerated **NVIDIA NVENC** & **AMD AMF** GPU encoding, task queue batch processing, and 2-pass rate control.
 
 ---
 
 ## 🌟 Key Features
 
+- 🧠 **Real-Time Quality Assessment & Actionable Tips (`QualityAssessment`)**:
+  - Live calculation of bits-per-pixel-frame (`bppf`) evaluating visual fidelity for games and action footage.
+  - Clear color-coded badges (**Great** 🟢 / **Good** 🟩 / **OK for Sharing** 🟨 / **Low** 🟧 / **Very Low** 🟥) accompanied by tailored advice (e.g. recommended time reduction, switching to 720p, or using Nitro 50 MB).
+- ⚙️ **Safe Source File Management (`SourceCleanupPolicy`)**:
+  - Configurable source cleanup preferences in Settings: **Keep original** (default), **Ask every time**, **Recycle Bin (auto)**, or **Permanent Delete**.
+  - Strict safety checks: source files are never deleted if output fails or if source and target paths match.
+- 🎬 **Intuitive Click-to-Play Video Interface**:
+  - Click directly on the video viewport or press `Space` to Play/Pause.
+  - Frame-accurate keyboard stepping (`←`/`→` for ±1s, `Shift + ←`/`→` for exact ±1 frame).
 - ⚡ **Instant Lossless Remuxing (`can_stream_copy`)**:
   - If a clip or file already fits under the target limit, CutGut automatically copies video/audio streams directly (`-c copy`) in ~0.2 seconds without re-encoding!
-- 📊 **Real-Time Plan Estimation**:
-  - Live bitrate, output resolution, FPS, and ETA calculations displayed dynamically before encoding.
-- ⌨️ **Keyboard Shortcuts & Timeline Handles**:
-  - `I`: Set Start (In point) from playhead.
-  - `O`: Set End (Out point) from playhead.
-  - `Space`: Play / Pause playback.
-  - `←` / `→`: Seek ±1 second (or `Shift + ←/→` for precise ±1 frame seeking).
 - 📋 **Batch Processing & Job Queue (`EncodeJob`)**:
-  - Queue multiple clips/ranges with sequential execution and per-task cancellation in GUI and CLI.
+  - Interactive queue panel with per-task progress, status tracking, and cancel/delete controls.
 - 🌐 **Multi-Language (Polski 🇵🇱 / English 🇬🇧)**:
   - Instant on-the-fly UI language switching persisted across sessions.
 - 🎯 **Target File Size Presets**:

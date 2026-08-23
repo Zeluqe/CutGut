@@ -12,7 +12,7 @@ if hasattr(sys.stderr, 'reconfigure'):
 
 import encoder
 
-__version__ = "202608230-1-1"
+__version__ = "202608230-2-0"
 
 def parse_target_mb(val: str) -> float:
     v = val.lower().replace('mb', '').replace('m', '').strip()
@@ -37,6 +37,17 @@ def main():
         help='Wybierz enkoder: nvenc (NVIDIA GPU HQ), nvenc_fast, amf (AMD GPU HQ), amf_fast, cpu (libx264 balanced), cpu_fast, hevc (libx265)'
     )
     parser.add_argument('-o', '--output', default=None, help='Sciezka do pliku wyjsciowego (dla pojedynczego pliku)')
+    parser.add_argument(
+        '--cleanup',
+        choices=['never', 'ask', 'trash', 'delete'],
+        default='never',
+        help='Polityka kasowania pliku zrodlowego: never (domyslnie), ask, trash (do Kosza), delete (trwale)'
+    )
+    parser.add_argument(
+        '--explain-plan',
+        action='store_true',
+        help='Wyswietl szczegolowa analize jakosci planu (bppf, ocena, porady) przed kodowaniem'
+    )
 
     args = parser.parse_args()
 
@@ -93,7 +104,8 @@ def main():
             start_s=start_s,
             end_s=end_s,
             target_mb=target_mb,
-            preset_mode=preset_mode
+            preset_mode=preset_mode,
+            cleanup_policy=args.cleanup
         )
         jobs.append(job)
 
@@ -102,7 +114,21 @@ def main():
         sys.exit(1)
 
     print(f'=== CutGut CLI v{__version__} | Kolejka zadan: {len(jobs)} ===')
-    print(f'Limit: {target_mb:.1f} MB | Enkoder: {preset_mode}\n')
+    print(f'Limit: {target_mb:.1f} MB | Enkoder: {preset_mode} | Czyszczenie: {args.cleanup}\n')
+
+    if args.explain_plan:
+        print('--- Analiza jakosci i planu eksportu ---')
+        for j in jobs:
+            info = encoder.probe_video(j.input_path)
+            plan = encoder.calculate_plan(info, j.start_s, j.end_s, j.target_mb, (j.preset_mode == 'CPU_HEVC'), j.input_path)
+            q = plan['quality']
+            print(f"Plik: {os.path.basename(j.input_path)}")
+            print(f"  Zakres: {j.start_s:.2f}s - {j.end_s:.2f}s ({plan['duration_s']:.2f}s)")
+            print(f"  Wyjscie: {plan['out_width']}x{plan['out_height']} @ {plan['out_fps']:.0f} FPS | Bitrate: ~{plan['video_kbps']} kbps (bppf: {q.bppf})")
+            print(f"  Ocena jakosci: [{q.label}] - {q.description}")
+            if q.tip:
+                print(f"  Wskazowka: {q.tip}")
+            print()
 
     def on_progress(p: encoder.ProgressUpdate):
         bar_len = 25
@@ -127,7 +153,21 @@ def main():
             final_size = os.path.getsize(res)
             job.status = 'finished'
             job.result_size = final_size
-            print(f'  -> Gotowe: {res} ({final_size / 1000000:.2f} MB / {final_size / (1024*1024):.2f} MiB)\n')
+            print(f'  -> Gotowe: {res} ({final_size / 1000000:.2f} MB / {final_size / (1024*1024):.2f} MiB)')
+
+            # Obsługa polityki czyszczenia
+            if job.cleanup_policy != 'never' and os.path.exists(res) and final_size > 0:
+                if job.cleanup_policy == 'ask':
+                    if sys.stdin.isatty():
+                        ans = input(f'  -> Czy usunac plik zrodlowy {os.path.basename(job.input_path)} do Kosza? [t/N]: ')
+                        if ans.lower() in ('t', 'y', 'tak', 'yes'):
+                            ok, msg = encoder.cleanup_source_file(job.input_path, res, encoder.SourceCleanupPolicy.TRASH)
+                            print(f'  -> {msg}')
+                else:
+                    pol = encoder.SourceCleanupPolicy(job.cleanup_policy)
+                    ok, msg = encoder.cleanup_source_file(job.input_path, res, pol)
+                    print(f'  -> {msg}')
+            print()
         except Exception as e:
             print(f'\n  -> Blad: {e}\n', file=sys.stderr)
             job.status = 'error'

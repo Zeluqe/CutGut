@@ -79,5 +79,31 @@ class TestEncoderCalculations(unittest.TestCase):
         # Przy braku istniejacego pliku na dysku zwraca False bezpiecznie
         self.assertFalse(encoder.can_stream_copy(v_info, 'non_existent_file.mp4', 0.0, 10.0, 20.0))
 
+    def test_quality_assessment_bppf(self):
+        # 1. 1080p60 przy ~2469 kbps -> bppf ~0.0198 -> rating "ok" ("OK do wysłania")
+        q_ok = encoder.assess_quality(video_kbps=2469, width=1920, height=1080, fps=60.0, dur_s=60.0, lang='pl')
+        self.assertEqual(q_ok.rating, 'ok')
+        self.assertIn('OK do wysłania', q_ok.label)
+        self.assertGreater(len(q_ok.tip), 0)
+
+        # 2. 720p30 przy ~2500 kbps -> bppf ~0.09 -> rating "great" ("Świetna jakość")
+        q_great = encoder.assess_quality(video_kbps=2500, width=1280, height=720, fps=30.0, dur_s=15.0, lang='pl')
+        self.assertEqual(q_great.rating, 'great')
+        self.assertIn('Świetna', q_great.label)
+
+        # 3. 1080p60 przy bardzo niskim bitrate ~500 kbps -> rating "very_low"
+        q_low = encoder.assess_quality(video_kbps=500, width=1920, height=1080, fps=60.0, dur_s=300.0, lang='pl')
+        self.assertIn(q_low.rating, ['low', 'very_low'])
+
+    def test_cleanup_policy_safety(self):
+        # 1. NEVER zwraca False i nie usuwa niczego
+        ok, msg = encoder.cleanup_source_file('some_file.mp4', 'out.mp4', encoder.SourceCleanupPolicy.NEVER)
+        self.assertFalse(ok)
+
+        # 2. Ta sama ścieżka wejścia i wyjścia jest bezpiecznie blokowana
+        ok, msg = encoder.cleanup_source_file('video.mp4', 'video.mp4', encoder.SourceCleanupPolicy.TRASH)
+        self.assertFalse(ok)
+        self.assertIn('zablokowana', msg)
+
 if __name__ == '__main__':
     unittest.main()
