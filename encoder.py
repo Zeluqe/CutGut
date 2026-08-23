@@ -13,9 +13,62 @@ from enum import Enum
 from dataclasses import dataclass
 from typing import Optional, Callable
 
-__version__ = "202608230-2-0"
+__version__ = "202608230-3-0"
 
 CREATE_NO_WINDOW = 0x08000000 if os.name == 'nt' else 0
+
+def get_base_dir() -> str:
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+def get_default_output_dir() -> str:
+    out_dir = os.path.join(get_base_dir(), 'outputs')
+    os.makedirs(out_dir, exist_ok=True)
+    return out_dir
+
+def get_temp_dir() -> str:
+    temp_dir = os.path.join(get_base_dir(), 'temp')
+    os.makedirs(temp_dir, exist_ok=True)
+    return temp_dir
+
+def validate_output_directory(path: str) -> tuple[bool, str]:
+    if not path or not path.strip():
+        return False, "Ścieżka folderu nie może być pusta."
+    p = os.path.abspath(path.strip())
+    try:
+        os.makedirs(p, exist_ok=True)
+        # Sprawdz uprawnienia do zapisu
+        test_file = os.path.join(p, f'.cutgut_test_{int(time.time()*1000)}')
+        with open(test_file, 'w') as f:
+            f.write('ok')
+        os.remove(test_file)
+        return True, "Folder jest poprawny i dostępny do zapisu."
+    except Exception as e:
+        return False, f"Brak możliwości zapisu w wybranym folderze: {e}"
+
+def generate_output_filepath(output_dir: str = '', base_name: str = '') -> str:
+    target_dir = output_dir if (output_dir and os.path.exists(output_dir)) else get_default_output_dir()
+    os.makedirs(target_dir, exist_ok=True)
+
+    timestamp = time.strftime('%Y%m%d_%H%M%S')
+    clean_base = re.sub(r'[^\w\-_\. ]', '_', base_name).strip() if base_name else ''
+    
+    if clean_base:
+        filename = f"CutGut_{clean_base}_{timestamp}.mp4"
+    else:
+        filename = f"CutGut_{timestamp}.mp4"
+        
+    candidate = os.path.join(target_dir, filename)
+    if not os.path.exists(candidate):
+        return candidate
+        
+    # Obsługa kolizji nazw (_2, _3, ...)
+    counter = 2
+    root, ext = os.path.splitext(filename)
+    while os.path.exists(os.path.join(target_dir, f"{root}_{counter}{ext}")):
+        counter += 1
+    return os.path.join(target_dir, f"{root}_{counter}{ext}")
 
 class SourceCleanupPolicy(str, Enum):
     NEVER = "never"
@@ -795,6 +848,106 @@ def encode_video(
             if f'ffmpeg2pass_{unique_id}' in f:
                 try: os.remove(os.path.join(base_dir, f))
                 except Exception: pass
+
+def create_quality_preview(
+    input_path: str,
+    center_s: float,
+    plan: dict,
+    preset_mode: str,
+    sample_dur_s: float = 6.0,
+    progress_callback: Optional[Callable[[ProgressUpdate], None]] = None,
+    cancel_token: Optional[CancellationToken] = None
+) -> str:
+    """
+    Tworzy krótki (5-8s) wycinek wideo w folderze temp z identycznymi parametrami jakości planu.
+    """
+    if not input_path or not os.path.exists(input_path):
+        raise EncodingError("Brak pliku źródłowego do utworzenia próbki jakości.")
+
+    ffmpeg_bin = get_ffmpeg_path()
+    temp_dir = get_temp_dir()
+    
+    half_dur = sample_dur_s / 2.0
+    start_s = max(center_s - half_dur, 0.0)
+    end_s = start_s + sample_dur_s
+    dur_s = sample_dur_s
+    
+    sample_output = os.path.join(temp_dir, f"CutGut_sample_{int(time.time()*1000)}.mp4")
+    
+    v_kbps = plan['video_kbps']
+    a_kbps = plan['audio_kbps']
+    vf_filter = plan.get('filter_str')
+    
+    common_args = ['-ss', f"{start_s:.2f}", '-to', f"{end_s:.2f}", '-i', input_path]
+    vf_args = ['-vf', vf_filter] if vf_filter else []
+
+    if plan.get('is_remux'):
+        cmd = [
+            ffmpeg_bin, '-y', '-hide_banner',
+            '-ss', f"{start_s:.2f}", '-to', f"{end_s:.2f}",
+            '-i', input_path,
+            '-c', 'copy',
+            '-movflags', '+faststart',
+            sample_output
+        ]
+        res = subprocess.run(cmd, capture_output=True, creationflags=CREATE_NO_WINDOW)
+        if res.returncode == 0 and os.path.exists(sample_output):
+            return sample_output
+
+    if preset_mode in ('NVENC_HQ', 'NVENC_FAST') and check_nvenc_support():
+        preset_val = 'p3' if preset_mode == 'NVENC_FAST' else 'p6'
+        cmd = [
+            ffmpeg_bin, '-y', '-hide_banner',
+            '-progress', 'pipe:1'
+        ] + common_args + vf_args + [
+            '-c:v', 'h264_nvenc',
+            '-preset', preset_val,
+            '-b:v', f"{v_kbps}k",
+            '-maxrate', f"{int(v_kbps * 1.25)}k",
+            '-bufsize', f"{int(v_kbps * 2.0)}k",
+            '-tune', 'hq',
+            '-pix_fmt', 'yuv420p',
+            '-c:a', 'aac',
+            '-b:a', f"{a_kbps}k",
+            '-movflags', '+faststart',
+            sample_output
+        ]
+    elif preset_mode in ('AMF_HQ', 'AMF_FAST') and check_amf_support():
+        quality_mode = 'quality' if preset_mode == 'AMF_HQ' else 'speed'
+        cmd = [
+            ffmpeg_bin, '-y', '-hide_banner',
+            '-progress', 'pipe:1'
+        ] + common_args + vf_args + [
+            '-c:v', 'h264_amf',
+            '-quality', quality_mode,
+            '-b:v', f"{v_kbps}k",
+            '-maxrate', f"{int(v_kbps * 1.25)}k",
+            '-bufsize', f"{int(v_kbps * 2.0)}k",
+            '-pix_fmt', 'yuv420p',
+            '-c:a', 'aac',
+            '-b:a', f"{a_kbps}k",
+            '-movflags', '+faststart',
+            sample_output
+        ]
+    else:
+        cmd = [
+            ffmpeg_bin, '-y', '-hide_banner',
+            '-progress', 'pipe:1'
+        ] + common_args + vf_args + [
+            '-c:v', 'libx264',
+            '-preset', 'veryfast',
+            '-b:v', f"{v_kbps}k",
+            '-pix_fmt', 'yuv420p',
+            '-c:a', 'aac',
+            '-b:a', f"{a_kbps}k",
+            '-movflags', '+faststart',
+            sample_output
+        ]
+
+    _run_ffmpeg_with_progress(cmd, dur_s, 'Tworzenie próbki jakości', progress_callback, cancel_token)
+    if os.path.exists(sample_output):
+        return sample_output
+    raise EncodingError("Nie udało się wygenerować próbki jakości.")
 
 def _run_ffmpeg_with_progress(
     cmd: list,

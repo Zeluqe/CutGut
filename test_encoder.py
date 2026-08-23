@@ -105,5 +105,22 @@ class TestEncoderCalculations(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn('zablokowana', msg)
 
+    def test_output_directories_and_naming(self):
+        import os
+        # 1. Domyślny folder outputs i temp
+        out_dir = encoder.get_default_output_dir()
+        temp_dir = encoder.get_temp_dir()
+        self.assertTrue(os.path.exists(out_dir))
+        self.assertTrue(os.path.exists(temp_dir))
+
+        # 2. Walidacja poprawnego katalogu
+        valid, msg = encoder.validate_output_directory(out_dir)
+        self.assertTrue(valid)
+
+        # 3. Generowanie ścieżki i format nazwy
+        fp = encoder.generate_output_filepath(output_dir=out_dir, base_name='TestClip')
+        self.assertIn('CutGut_TestClip_', fp)
+        self.assertTrue(fp.endswith('.mp4'))
+
 if __name__ == '__main__':
     unittest.main()

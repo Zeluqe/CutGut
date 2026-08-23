@@ -1,27 +1,34 @@
 # ✂️ CutGut
 
-[![Version](https://img.shields.io/badge/version-202608230--2--0-blue.svg)](https://github.com/Zeluqe/CutGut/releases/tag/202608230-2-0)
+[![Version](https://img.shields.io/badge/version-202608230--3--0-blue.svg)](https://github.com/Zeluqe/CutGut/releases/tag/202608230-3-0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://www.python.org/)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-Supported-red.svg)](https://ffmpeg.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)]()
 
-[![Download CutGut.exe](https://img.shields.io/badge/Download-CutGut.exe%20(Build%20202608230--2--0)-2563eb?logo=windows&style=for-the-badge)](https://github.com/Zeluqe/CutGut/releases/download/202608230-2-0/CutGut.exe)
+[![Download CutGut.exe](https://img.shields.io/badge/Download-CutGut.exe%20(Build%20202608230--3--0)-2563eb?logo=windows&style=for-the-badge)](https://github.com/Zeluqe/CutGut/releases/download/202608230-3-0/CutGut.exe)
 
 > **High-precision video trimming and smart compression tool tailored for Discord (20 MB free tier, 50 MB / 500 MB Nitro), Messenger, and social uploads.**
 
-CutGut provides frame-accurate video clipping, real-time quality grading (bppf), instant lossless remuxing, safe source recycling policies, hardware-accelerated **NVIDIA NVENC** & **AMD AMF** GPU encoding, task queue batch processing, and 2-pass rate control.
+CutGut provides frame-accurate video clipping, real-time quality grading (bppf), A/B video player comparison, on-demand quality preview samples, custom output directory management, safe source recycling policies, hardware-accelerated **NVIDIA NVENC** & **AMD AMF** GPU encoding, task queue batch processing, and 2-pass rate control.
 
 ---
 
 ## 🌟 Key Features
 
+- 🔬 **Quality Preview Sample (`create_quality_preview`)**:
+  - Test the actual encoded video quality on dynamic scenes (smoke, teamfights, motion) before running the full export with `[ 🔬 Sprawdź jakość w tym momencie ]`.
+  - Encodes a rapid 6-second sample with exact resolution, bitrate, filters, and encoder presets into `temp/`.
+- 🔄 **A/B Video Player Comparison**:
+  - Seamlessly toggle between `[ 📹 Oryginał ]` and `[ ✨ Wynik ✓ / 🔬 Próbka ]` while maintaining playback position.
+- 📁 **Custom Output Directory & Collision-Free Naming**:
+  - Choose your preferred save destination in Settings (⚙) with instant 1-click reset to default `outputs/`.
+  - Automatic collision resolution (`CutGut_YYYYMMDD_HHMMSS.mp4`, `_2`, `_3`).
 - 🧠 **Real-Time Quality Assessment & Actionable Tips (`QualityAssessment`)**:
-  - Live calculation of bits-per-pixel-frame (`bppf`) evaluating visual fidelity for games and action footage.
-  - Clear color-coded badges (**Great** 🟢 / **Good** 🟩 / **OK for Sharing** 🟨 / **Low** 🟧 / **Very Low** 🟥) accompanied by tailored advice (e.g. recommended time reduction, switching to 720p, or using Nitro 50 MB).
+  - Live calculation of bits-per-pixel-frame (`bppf`) evaluating visual fidelity.
+  - Clear color-coded badges (**Great** 🟢 / **Good** 🟩 / **OK for Sharing** 🟨 / **Low** 🟧 / **Very Low** 🟥) accompanied by tailored advice.
 - ⚙️ **Safe Source File Management (`SourceCleanupPolicy`)**:
   - Configurable source cleanup preferences in Settings: **Keep original** (default), **Ask every time**, **Recycle Bin (auto)**, or **Permanent Delete**.
-  - Strict safety checks: source files are never deleted if output fails or if source and target paths match.
 - 🎬 **Intuitive Click-to-Play Video Interface**:
   - Click directly on the video viewport or press `Space` to Play/Pause.
   - Frame-accurate keyboard stepping (`←`/`→` for ±1s, `Shift + ←`/`→` for exact ±1 frame).

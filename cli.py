@@ -12,7 +12,7 @@ if hasattr(sys.stderr, 'reconfigure'):
 
 import encoder
 
-__version__ = "202608230-2-0"
+__version__ = "202608230-3-0"
 
 def parse_target_mb(val: str) -> float:
     v = val.lower().replace('mb', '').replace('m', '').strip()
@@ -37,6 +37,7 @@ def main():
         help='Wybierz enkoder: nvenc (NVIDIA GPU HQ), nvenc_fast, amf (AMD GPU HQ), amf_fast, cpu (libx264 balanced), cpu_fast, hevc (libx265)'
     )
     parser.add_argument('-o', '--output', default=None, help='Sciezka do pliku wyjsciowego (dla pojedynczego pliku)')
+    parser.add_argument('--output-dir', default=None, help='Docelowy folder dla wygenerowanych plikow wideo')
     parser.add_argument(
         '--cleanup',
         choices=['never', 'ask', 'trash', 'delete'],
@@ -47,6 +48,12 @@ def main():
         '--explain-plan',
         action='store_true',
         help='Wyswietl szczegolowa analize jakosci planu (bppf, ocena, porady) przed kodowaniem'
+    )
+    parser.add_argument(
+        '--preview-at',
+        type=float,
+        default=None,
+        help='Wygeneruj 6-sekundowa probke jakosci wokol podanego czasu (w sekundach) bez pelnego kodowania'
     )
 
     args = parser.parse_args()
@@ -68,8 +75,19 @@ def main():
         preset_mode = encoder.get_best_available_encoder()
 
     target_mb = parse_target_mb(args.target)
-    out_dir = os.path.join(encoder.get_base_dir(), 'outputs')
+    out_dir = args.output_dir if args.output_dir else encoder.get_default_output_dir()
     os.makedirs(out_dir, exist_ok=True)
+
+    # Obsługa generowania samej próbki jakości (--preview-at)
+    if args.preview_at is not None:
+        for inp in args.inputs:
+            if not os.path.exists(inp): continue
+            info = encoder.probe_video(inp)
+            plan = encoder.calculate_plan(info, max(args.start, 0.0), args.end or info.duration, target_mb, (preset_mode == 'CPU_HEVC'), inp)
+            print(f"Tworzenie probki jakosci dla {os.path.basename(inp)} w punkcie {args.preview_at:.2f}s...")
+            sample = encoder.create_quality_preview(inp, args.preview_at, plan, preset_mode)
+            print(f"  -> Gotowa probka: {sample}\n")
+        return
 
     # Budowanie kolejki EncodeJob
     jobs: list[encoder.EncodeJob] = []
@@ -95,7 +113,7 @@ def main():
             out_file = args.output
         else:
             base_name = os.path.splitext(os.path.basename(inp))[0]
-            out_file = os.path.join(out_dir, f'CutGut_{base_name}_{int(time.time())}_{idx+1}.mp4')
+            out_file = encoder.generate_output_filepath(output_dir=out_dir, base_name=base_name)
 
         job = encoder.EncodeJob(
             job_id=str(idx + 1),
