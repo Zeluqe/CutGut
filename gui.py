@@ -48,7 +48,7 @@ class EncodingWorker(QThread):
     def cancel(self):
         self.cancel_token.cancel()
 
-__version__ = "202608230-1-0"
+__version__ = "202608230-1-1"
 
 TRANSLATIONS = {
     'pl': {

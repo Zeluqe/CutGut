@@ -8,10 +8,11 @@ import shutil
 import urllib.request
 import zipfile
 import functools
+import threading
 from dataclasses import dataclass
 from typing import Optional, Callable
 
-__version__ = "202608230-1-0"
+__version__ = "202608230-1-1"
 
 CREATE_NO_WINDOW = 0x08000000 if os.name == 'nt' else 0
 
@@ -605,6 +606,21 @@ def _run_ffmpeg_with_progress(
     if cancel_token:
         cancel_token.current_process = proc
 
+    stderr_lines = []
+    def drain_stderr():
+        try:
+            for l in proc.stderr:
+                if len(stderr_lines) < 100:
+                    stderr_lines.append(l)
+                else:
+                    stderr_lines.pop(0)
+                    stderr_lines.append(l)
+        except Exception:
+            pass
+
+    t_err = threading.Thread(target=drain_stderr, daemon=True)
+    t_err.start()
+
     out_time_us = 0
     speed_str = '1.0x'
     fps_val = 0.0
@@ -658,8 +674,10 @@ def _run_ffmpeg_with_progress(
                         ))
 
         ret = proc.wait()
+        t_err.join(timeout=0.5)
+
         if ret != 0:
-            err_msg = proc.stderr.read()
+            err_msg = "".join(stderr_lines)
             if cancel_token and cancel_token.cancelled:
                 raise EncodingError('Operacja anulowana.')
             raise EncodingError(f'Blad FFmpeg (kod {ret}): {err_msg[-300:]}')
