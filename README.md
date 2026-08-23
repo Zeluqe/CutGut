@@ -5,6 +5,9 @@
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-Supported-red.svg)](https://ffmpeg.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)]()
 
+[![Download CutGut.exe](https://img.shields.io/badge/Download-CutGut.exe%20(11.9%20MB)-blue?logo=windows&style=for-the-badge)](https://github.com/Zeluqe/CutGut/releases/download/v2.0.0/CutGut.exe)
+
+
 > **Smart, high-precision video trimming and 2-pass compression tool designed to hit exact file size limits (under 10 MB and 20 MB) for Discord, Messenger, Email, and social platforms.**
 
 CutGut automatically calculates exact 2-pass video and audio bitrates using **H.264** or **H.265 (HEVC)** codecs, ensuring maximum visual clarity while keeping files safely below strict upload caps (e.g. **~9.95 MB** or **~19.95 MB** as reported by Windows File Explorer).
