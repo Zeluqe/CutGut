@@ -86,7 +86,7 @@ class SamplePreviewWorker(QThread):
     def cancel(self):
         self.cancel_token.cancel()
 
-__version__ = "202608230-5-0"
+__version__ = "202608230-5-1"
 
 TRANSLATIONS = {
     'pl': {
@@ -868,9 +868,9 @@ class CutGutApp(QMainWindow):
         row_fmt = QHBoxLayout()
         
         # Social Profile Preset
-        lbl_prof = QLabel('📱 <b>Preset:</b>')
-        lbl_prof.setStyleSheet('color: #60a5fa; font-size: 12px;')
-        row_fmt.addWidget(lbl_prof)
+        self.lblProf = QLabel('📱 <b>Preset:</b>')
+        self.lblProf.setStyleSheet('color: #60a5fa; font-size: 12px;')
+        row_fmt.addWidget(self.lblProf)
 
         self.socialCombo = QComboBox()
         self.socialCombo.setFixedWidth(205)
@@ -878,9 +878,9 @@ class CutGutApp(QMainWindow):
         row_fmt.addWidget(self.socialCombo)
 
         # Aspect Ratio / Kadrowanie
-        lbl_crop = QLabel('📐 <b>Kadr:</b>')
-        lbl_crop.setStyleSheet('color: #60a5fa; font-size: 12px; margin-left: 6px;')
-        row_fmt.addWidget(lbl_crop)
+        self.lblCrop = QLabel('📐 <b>Kadr:</b>')
+        self.lblCrop.setStyleSheet('color: #60a5fa; font-size: 12px; margin-left: 6px;')
+        row_fmt.addWidget(self.lblCrop)
 
         self.ratioCombo = QComboBox()
         self.ratioCombo.setFixedWidth(190)
@@ -1194,7 +1194,8 @@ class CutGutApp(QMainWindow):
         self.btnAlignLeft.setText(self.t('btn_align_left'))
         self.btnAlignCenter.setText(self.t('btn_align_center'))
         self.btnAlignRight.setText(self.t('btn_align_right'))
-        self.lblPlanTitle.setText(f"📊 {self.t('plan_box_title')}")
+        self.lblProf.setText(f"📱 <b>{'Preset:' if self.current_lang == 'pl' else 'Preset:'}</b>")
+        self.lblCrop.setText(f"📐 <b>{'Kadr:' if self.current_lang == 'pl' else 'Crop:'}</b>")
         self.btnTestSample.setText(self.t('btn_test_sample'))
         self.cropContainer.setToolTip(self.t('video_tooltip'))
 
