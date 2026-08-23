@@ -86,7 +86,7 @@ class SamplePreviewWorker(QThread):
     def cancel(self):
         self.cancel_token.cancel()
 
-__version__ = "202608230-5-3"
+__version__ = "202608240-5-4"
 
 TRANSLATIONS = {
     'pl': {

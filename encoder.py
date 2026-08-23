@@ -13,7 +13,7 @@ from enum import Enum
 from dataclasses import dataclass
 from typing import Optional, Callable
 
-__version__ = "202608230-5-3"
+__version__ = "202608240-5-4"
 
 CREATE_NO_WINDOW = 0x08000000 if os.name == 'nt' else 0
 
@@ -215,6 +215,7 @@ class EncodeJob:
     result_size: int = 0
     error_message: str = ""
     cleanup_policy: str = "never"
+    crop_box: Optional[CropBox] = None
 
 @dataclass
 class ExportResult:
@@ -230,6 +231,7 @@ class ExportResult:
     plan: Optional[dict] = None
     preset_mode: str = ""
     cleanup_policy: str = "never"
+    crop_box: Optional[CropBox] = None
 
 @dataclass
 class ProgressUpdate:
