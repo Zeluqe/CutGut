@@ -156,5 +156,37 @@ class TestEncoderCalculations(unittest.TestCase):
         self.assertEqual(res.target_mb, 20.0)
         self.assertEqual(res.cleanup_policy, "trash")
 
+    def test_crop_box_and_aspect_ratios(self):
+        # 1. Obliczanie kadru 9:16 z wideo 1920x1080
+        crop_9_16 = encoder.calculate_default_crop(1920, 1080, "9:16", "center")
+        self.assertEqual(crop_9_16.h, 1080)
+        self.assertEqual(crop_9_16.w, 606) # 1080 * 9 / 16 = 607.5 -> 606 (parzyste)
+        self.assertEqual(crop_9_16.x, (1920 - 606) // 2) # 657
+        self.assertEqual(crop_9_16.to_filter(), "crop=606:1080:656:0") # Parzyste dla YUV420p
+
+        # 2. Wyrównanie lewo i prawo
+        crop_left = encoder.calculate_default_crop(1920, 1080, "9:16", "left")
+        self.assertEqual(crop_left.x, 0)
+
+        crop_right = encoder.calculate_default_crop(1920, 1080, "9:16", "right")
+        self.assertEqual(crop_right.x, 1920 - 606)
+
+        # 3. Kwadrat 1:1
+        crop_1_1 = encoder.calculate_default_crop(1920, 1080, "1:1", "center")
+        self.assertEqual(crop_1_1.w, 1080)
+        self.assertEqual(crop_1_1.h, 1080)
+        self.assertEqual(crop_1_1.x, (1920 - 1080) // 2)
+
+        # 4. Plan eksportu z cropem
+        v_info = encoder.VideoInfo(
+            duration=60.0, width=1920, height=1080, fps=60.0,
+            bitrate=10000000, codec='h264', audio_codec='aac'
+        )
+        plan = encoder.calculate_plan(v_info, 0.0, 15.0, 20.0, crop_box=crop_9_16)
+        self.assertFalse(plan['is_remux']) # Crop wymusza re-enkodowanie
+        self.assertIn('crop=', plan['filter_str'])
+        self.assertEqual(plan['out_width'], 606)
+        self.assertEqual(plan['out_height'], 1080)
+
 if __name__ == '__main__':
     unittest.main()

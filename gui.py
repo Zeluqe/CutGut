@@ -11,20 +11,20 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QFrame, QTextEdit
 )
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
-from PyQt6.QtMultimediaWidgets import QVideoWidget
 from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QThread, QSettings, QEvent
 from PyQt6.QtGui import QFont, QColor
 
 import encoder
 import update_service
-from comparison_dialog import QualityComparisonDialog, ClickableVideoWidget
+from comparison_dialog import QualityComparisonDialog
+from crop_overlay import CropVideoContainer
 
 class EncodingWorker(QThread):
     progress_signal = pyqtSignal(object)
     finished_signal = pyqtSignal(str, int)
     error_signal = pyqtSignal(str)
 
-    def __init__(self, input_path: str, output_path: str, start_s: float, end_s: float, target_mb: float, mode: str):
+    def __init__(self, input_path: str, output_path: str, start_s: float, end_s: float, target_mb: float, mode: str, crop_box: Optional[encoder.CropBox] = None):
         super().__init__()
         self.input_path = input_path
         self.output_path = output_path
@@ -32,6 +32,7 @@ class EncodingWorker(QThread):
         self.end_s = end_s
         self.target_mb = target_mb
         self.mode = mode
+        self.crop_box = crop_box
         self.cancel_token = encoder.CancellationToken()
 
     def run(self):
@@ -44,7 +45,8 @@ class EncodingWorker(QThread):
                 target_mb=self.target_mb,
                 preset_mode=self.mode,
                 progress_callback=lambda p: self.progress_signal.emit(p),
-                cancel_token=self.cancel_token
+                cancel_token=self.cancel_token,
+                crop_box=self.crop_box
             )
             final_size = os.path.getsize(res) if os.path.exists(res) else 0
             self.finished_signal.emit(res, final_size)
@@ -58,12 +60,13 @@ class SamplePreviewWorker(QThread):
     finished_signal = pyqtSignal(str)
     error_signal = pyqtSignal(str)
 
-    def __init__(self, input_path: str, center_s: float, plan: dict, preset_mode: str):
+    def __init__(self, input_path: str, center_s: float, plan: dict, preset_mode: str, crop_box: Optional[encoder.CropBox] = None):
         super().__init__()
         self.input_path = input_path
         self.center_s = center_s
         self.plan = plan
         self.preset_mode = preset_mode
+        self.crop_box = crop_box
         self.cancel_token = encoder.CancellationToken()
 
     def run(self):
@@ -83,11 +86,11 @@ class SamplePreviewWorker(QThread):
     def cancel(self):
         self.cancel_token.cancel()
 
-__version__ = "202608230-4-0"
+__version__ = "202608230-5-0"
 
 TRANSLATIONS = {
     'pl': {
-        'title': 'CutGut v{version} - Przycinanie i inteligentna kompresja wideo',
+        'title': 'CutGut v{version} - Format & Social Export | Przycinanie i inteligentna kompresja wideo',
         'btn_start': '📍 START (I)',
         'btn_end': '📍 KONIEC (O)',
         'btn_set_in': 'USTAW I',
@@ -102,15 +105,35 @@ TRANSLATIONS = {
         'btn_add_queue': '＋ DO KOLEJKI',
         'btn_cancel': '✕ ANULUJ',
         'btn_settings': '⚙ Ustawienia',
+        'btn_screenshot': '📸 Klatka PNG',
         'lbl_source': 'Źródło: {name}',
         'lbl_no_file': 'Brak wybranego filmu (przeciągnij plik tutaj)',
         'lbl_queue_header': '📋 Kolejka zadań ({count}):',
-        'video_tooltip': 'Kliknij w podgląd lub naciśnij Spację, aby włączyć/zatrzymać odtwarzanie',
+        'video_tooltip': 'Kliknij w podgląd lub naciśnij Spację, aby włączyć/zatrzymać odtwarzanie. Przeciągaj ramkę kadru myszką.',
         'plan_box_title': 'Plan eksportu & Jakość',
         'btn_test_sample': '🔬 Sprawdź jakość w tym momencie',
         'sample_remux_msg': '⚡ Brak kompresji (Remux) — film zachowa 100% oryginalnej jakości.',
         'sample_generating': '⏳ Generowanie próbki jakości (6s wokół kursora)...',
         'sample_done': '✅ Próbka gotowa! Otwarto okno porównania jakości A/B.',
+        'screenshot_saved': '📸 Zapisano klatkę PNG: {path}',
+        'social_presets': [
+            '🎯 Discord Clip (20 MB)',
+            '💎 Discord Nitro (50 MB)',
+            '📱 Shorts / TikTok HQ (50 MB)',
+            '📱 Shorts Small (20 MB)',
+            '🎬 TikTok / Reels (50 MB)',
+            '⬛ Square Meme (20 MB)',
+            '⚙️ Własny format...'
+        ],
+        'aspect_ratios': [
+            '🖥️ Oryginalny (Cały obraz)',
+            '📱 Pionowy 9:16 (Shorts / TikTok)',
+            '⬛ Kwadrat 1:1 (Post / Memy)',
+            '🎬 Poziomy 16:9 (Gameplay)'
+        ],
+        'btn_align_left': '◀ Lewo',
+        'btn_align_center': '🎯 Środek',
+        'btn_align_right': 'Prawo ▶',
         'presets': [
             '🎯 Discord Free (20 MB)',
             '📦 Legacy / Small (10 MB)',
@@ -182,7 +205,7 @@ TRANSLATIONS = {
         'no_update_msg': 'Posiadasz najnowszą wersję programu ({version})!'
     },
     'en': {
-        'title': 'CutGut v{version} - Video Trimming & Smart Compression',
+        'title': 'CutGut v{version} - Format & Social Export | Video Trimming & Smart Compression',
         'btn_start': '📍 START (I)',
         'btn_end': '📍 END (O)',
         'btn_set_in': 'SET I',
@@ -197,15 +220,35 @@ TRANSLATIONS = {
         'btn_add_queue': '＋ TO QUEUE',
         'btn_cancel': '✕ CANCEL',
         'btn_settings': '⚙ Settings',
+        'btn_screenshot': '📸 Frame PNG',
         'lbl_source': 'Source: {name}',
         'lbl_no_file': 'No video selected (drag & drop file here)',
         'lbl_queue_header': '📋 Task Queue ({count}):',
-        'video_tooltip': 'Click preview or press Space to play/pause',
+        'video_tooltip': 'Click preview or press Space to play/pause. Drag framing box with mouse.',
         'plan_box_title': 'Export Plan & Quality',
         'btn_test_sample': '🔬 Test Quality Sample at this point',
         'sample_remux_msg': '⚡ Direct Stream Copy (Remux) — 100% original quality preserved.',
         'sample_generating': '⏳ Generating quality sample (6s around playhead)...',
         'sample_done': '✅ Sample ready! Opened A/B quality comparison window.',
+        'screenshot_saved': '📸 Saved PNG frame: {path}',
+        'social_presets': [
+            '🎯 Discord Clip (20 MB)',
+            '💎 Discord Nitro (50 MB)',
+            '📱 Shorts / TikTok HQ (50 MB)',
+            '📱 Shorts Small (20 MB)',
+            '🎬 TikTok / Reels (50 MB)',
+            '⬛ Square Meme (20 MB)',
+            '⚙️ Custom format...'
+        ],
+        'aspect_ratios': [
+            '🖥️ Original (Full frame)',
+            '📱 Vertical 9:16 (Shorts / TikTok)',
+            '⬛ Square 1:1 (Post / Memes)',
+            '🎬 Horizontal 16:9 (Gameplay)'
+        ],
+        'btn_align_left': '◀ Left',
+        'btn_align_center': '🎯 Center',
+        'btn_align_right': 'Right ▶',
         'presets': [
             '🎯 Discord Free (20 MB)',
             '📦 Legacy / Small (10 MB)',
@@ -456,7 +499,6 @@ class SettingsDialog(QDialog):
         reset_box.addWidget(self.btnResetDir)
         layout.addLayout(reset_box)
 
-        # Linia podziału
         line1 = QFrame()
         line1.setFrameShape(QFrame.Shape.HLine)
         line1.setStyleSheet('color: #1e293b;')
@@ -492,7 +534,6 @@ class SettingsDialog(QDialog):
         else:
             self.rb_never.setChecked(True)
 
-        # Linia podziału
         line2 = QFrame()
         line2.setFrameShape(QFrame.Shape.HLine)
         line2.setStyleSheet('color: #1e293b;')
@@ -511,7 +552,6 @@ class SettingsDialog(QDialog):
         self.chkAutoAB.setChecked(self.auto_ab)
         layout.addWidget(self.chkAutoAB)
 
-        # Linia podziału
         line3 = QFrame()
         line3.setFrameShape(QFrame.Shape.HLine)
         line3.setStyleSheet('color: #1e293b;')
@@ -628,7 +668,7 @@ class CutGutApp(QMainWindow):
         self.auto_check_updates = (self.settings.value('auto_check_updates', 'true') == 'true')
         self.include_prerelease = (self.settings.value('include_prerelease', 'false') == 'true')
 
-        self.setMinimumSize(1000, 880)
+        self.setMinimumSize(1020, 910)
         self.setAcceptDrops(True)
 
         self.setStyleSheet('''
@@ -681,6 +721,8 @@ class CutGutApp(QMainWindow):
         self.start_ms = 0
         self.end_ms = 0
         self.custom_mb = 20.0
+        self.current_crop: Optional[encoder.CropBox] = None
+        
         self.worker = None
         self.sample_worker = None
         self.bg_update_worker = None
@@ -688,12 +730,14 @@ class CutGutApp(QMainWindow):
         self.queue: list[encoder.EncodeJob] = []
         self.active_job: Optional[encoder.EncodeJob] = None
 
-        # Media Player
+        # Media Player & Custom Crop Container
         self.mediaPlayer = QMediaPlayer()
-        self.videoWidget = ClickableVideoWidget()
-        self.videoWidget.clicked_signal.connect(self.play_pause)
+        self.cropContainer = CropVideoContainer()
+        self.cropContainer.clicked_signal.connect(self.play_pause)
+        self.cropContainer.crop_changed_signal.connect(self.on_crop_changed)
+        
         self.audioOutput = QAudioOutput()
-        self.mediaPlayer.setVideoOutput(self.videoWidget)
+        self.mediaPlayer.setVideoOutput(self.cropContainer.video_widget)
         self.mediaPlayer.setAudioOutput(self.audioOutput)
         self.audioOutput.setVolume(0.7)
 
@@ -708,20 +752,20 @@ class CutGutApp(QMainWindow):
 
     def init_ui(self):
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(16, 12, 16, 12)
-        main_layout.setSpacing(8)
+        main_layout.setContentsMargins(16, 10, 16, 10)
+        main_layout.setSpacing(7)
 
-        # 1. Ekran wideo z tooltipem
-        self.videoWidget.setStyleSheet('background-color: black; border-radius: 8px; border: 2px solid #1e293b;')
-        self.videoWidget.setMinimumHeight(370)
-        self.videoWidget.setToolTip(self.t('video_tooltip'))
-        main_layout.addWidget(self.videoWidget)
+        # 1. Ekran wideo z nakładką CropOverlay
+        self.cropContainer.setStyleSheet('background-color: black; border-radius: 8px; border: 2px solid #1e293b;')
+        self.cropContainer.setMinimumHeight(350)
+        self.cropContainer.setToolTip(self.t('video_tooltip'))
+        main_layout.addWidget(self.cropContainer, 1)
 
-        # 2. Pasek czasu i kontrolki odtwarzacza
+        # 2. Pasek czasu i kontrolki odtwarzacza + Przycisk PNG Frame
         player_panel = QWidget()
         player_layout = QVBoxLayout(player_panel)
         player_layout.setContentsMargins(0, 0, 0, 0)
-        player_layout.setSpacing(5)
+        player_layout.setSpacing(4)
 
         self.positionSlider = QSlider(Qt.Orientation.Horizontal)
         self.positionSlider.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -742,6 +786,13 @@ class CutGutApp(QMainWindow):
         self.chkLoop = QCheckBox()
         self.chkLoop.setStyleSheet('margin-left: 8px;')
         controls_row.addWidget(self.chkLoop)
+
+        # Przycisk zapisu klatki jako PNG (📸)
+        self.btnScreenshot = QPushButton(self.t('btn_screenshot'))
+        self.btnScreenshot.setStyleSheet('background-color: #0f766e; font-size: 11px; padding: 5px 10px;')
+        self.btnScreenshot.setEnabled(False)
+        self.btnScreenshot.clicked.connect(self.capture_png_frame)
+        controls_row.addWidget(self.btnScreenshot)
 
         controls_row.addStretch()
 
@@ -777,32 +828,29 @@ class CutGutApp(QMainWindow):
         trim_card = QFrame()
         trim_card.setStyleSheet('background-color: #131d2e; border-radius: 8px; border: 1px solid #1e293b;')
         trim_layout = QHBoxLayout(trim_card)
-        trim_layout.setContentsMargins(10, 5, 10, 5)
+        trim_layout.setContentsMargins(10, 4, 10, 4)
         trim_layout.setSpacing(10)
 
-        # Start (IN)
         in_box = QHBoxLayout()
         self.lblInTime = QLabel('IN: 00:00.00')
         self.lblInTime.setStyleSheet('font-weight: bold; color: #34d399; font-size: 13px;')
         self.btnStart = QPushButton()
-        self.btnStart.setStyleSheet('background-color: #059669; padding: 5px 12px;')
+        self.btnStart.setStyleSheet('background-color: #059669; padding: 4px 10px;')
         self.btnStart.clicked.connect(self.set_start)
         in_box.addWidget(self.lblInTime)
         in_box.addWidget(self.btnStart)
         trim_layout.addLayout(in_box)
 
-        # Długość (Środek)
         self.lblDuration = QLabel('⏱️ DŁUGOŚĆ: 00:00.00')
         self.lblDuration.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lblDuration.setStyleSheet('font-size: 13px; font-weight: bold; color: #60a5fa;')
         trim_layout.addWidget(self.lblDuration, 1)
 
-        # Koniec (OUT)
         out_box = QHBoxLayout()
         self.lblOutTime = QLabel('OUT: 00:00.00')
         self.lblOutTime.setStyleSheet('font-weight: bold; color: #f87171; font-size: 13px;')
         self.btnEnd = QPushButton()
-        self.btnEnd.setStyleSheet('background-color: #dc2626; padding: 5px 12px;')
+        self.btnEnd.setStyleSheet('background-color: #dc2626; padding: 4px 10px;')
         self.btnEnd.clicked.connect(self.set_end)
         out_box.addWidget(self.lblOutTime)
         out_box.addWidget(self.btnEnd)
@@ -810,51 +858,95 @@ class CutGutApp(QMainWindow):
 
         main_layout.addWidget(trim_card)
 
-        # 4. Centrum decyzji: Panel Planu, Jakości & Próbki
-        self.planCard = QFrame()
-        self.planCard.setStyleSheet('background-color: #1e293b; border-radius: 8px; border: 1px solid #334155;')
-        plan_layout = QVBoxLayout(self.planCard)
-        plan_layout.setContentsMargins(14, 8, 14, 8)
-        plan_layout.setSpacing(4)
+        # 4. Centrum Format & Social Presets + Plan Jakości
+        format_card = QFrame()
+        format_card.setStyleSheet('background-color: #1e293b; border-radius: 8px; border: 1px solid #334155;')
+        fmt_layout = QVBoxLayout(format_card)
+        fmt_layout.setContentsMargins(12, 6, 12, 6)
+        fmt_layout.setSpacing(4)
 
-        q_row = QHBoxLayout()
-        self.lblPlanTitle = QLabel('📊 Plan eksportu')
-        self.lblPlanTitle.setStyleSheet('font-weight: bold; color: #94a3b8; font-size: 12px;')
-        q_row.addWidget(self.lblPlanTitle)
+        row_fmt = QHBoxLayout()
+        
+        # Social Profile Preset
+        lbl_prof = QLabel('📱 <b>Preset:</b>')
+        lbl_prof.setStyleSheet('color: #60a5fa; font-size: 12px;')
+        row_fmt.addWidget(lbl_prof)
+
+        self.socialCombo = QComboBox()
+        self.socialCombo.setFixedWidth(205)
+        self.socialCombo.currentIndexChanged.connect(self.on_social_preset_changed)
+        row_fmt.addWidget(self.socialCombo)
+
+        # Aspect Ratio / Kadrowanie
+        lbl_crop = QLabel('📐 <b>Kadr:</b>')
+        lbl_crop.setStyleSheet('color: #60a5fa; font-size: 12px; margin-left: 6px;')
+        row_fmt.addWidget(lbl_crop)
+
+        self.ratioCombo = QComboBox()
+        self.ratioCombo.setFixedWidth(190)
+        self.ratioCombo.currentIndexChanged.connect(self.on_ratio_changed)
+        row_fmt.addWidget(self.ratioCombo)
+
+        # Przyciski wyrównania kadru (Lewo / Środek / Prawo)
+        self.alignBox = QWidget()
+        align_layout = QHBoxLayout(self.alignBox)
+        align_layout.setContentsMargins(0, 0, 0, 0)
+        align_layout.setSpacing(3)
+
+        self.btnAlignLeft = QPushButton(self.t('btn_align_left'))
+        self.btnAlignLeft.setStyleSheet('font-size: 10px; padding: 4px 7px;')
+        self.btnAlignLeft.clicked.connect(lambda: self.cropContainer.overlay.set_alignment('left'))
+        align_layout.addWidget(self.btnAlignLeft)
+
+        self.btnAlignCenter = QPushButton(self.t('btn_align_center'))
+        self.btnAlignCenter.setStyleSheet('font-size: 10px; padding: 4px 7px; background-color: #2563eb;')
+        self.btnAlignCenter.clicked.connect(lambda: self.cropContainer.overlay.set_alignment('center'))
+        align_layout.addWidget(self.btnAlignCenter)
+
+        self.btnAlignRight = QPushButton(self.t('btn_align_right'))
+        self.btnAlignRight.setStyleSheet('font-size: 10px; padding: 4px 7px;')
+        self.btnAlignRight.clicked.connect(lambda: self.cropContainer.overlay.set_alignment('right'))
+        align_layout.addWidget(self.btnAlignRight)
+
+        self.alignBox.setVisible(False)
+        row_fmt.addWidget(self.alignBox)
+
+        row_fmt.addStretch()
 
         self.btnTestSample = QPushButton(self.t('btn_test_sample'))
         self.btnTestSample.setStyleSheet('background-color: #0e7490; font-size: 11px; padding: 4px 10px;')
         self.btnTestSample.setEnabled(False)
         self.btnTestSample.clicked.connect(self.create_sample_preview)
-        q_row.addWidget(self.btnTestSample)
-        q_row.addStretch()
+        row_fmt.addWidget(self.btnTestSample)
 
         self.lblQualityBadge = QLabel('● Oczekiwanie na film')
-        self.lblQualityBadge.setStyleSheet('font-weight: bold; font-size: 13px; color: #94a3b8;')
-        q_row.addWidget(self.lblQualityBadge)
-        plan_layout.addLayout(q_row)
+        self.lblQualityBadge.setStyleSheet('font-weight: bold; font-size: 13px; color: #94a3b8; margin-left: 6px;')
+        row_fmt.addWidget(self.lblQualityBadge)
 
+        fmt_layout.addLayout(row_fmt)
+
+        # Linia 2: Parametry techniczne i Wskazówki
         self.lblPlanDetails = QLabel('Wybierz wideo, aby zobaczyć planowane parametry kodowania.')
-        self.lblPlanDetails.setStyleSheet('font-size: 13px; font-weight: 600; color: #f8fafc;')
-        plan_layout.addWidget(self.lblPlanDetails)
+        self.lblPlanDetails.setStyleSheet('font-size: 12px; font-weight: 600; color: #f8fafc;')
+        fmt_layout.addWidget(self.lblPlanDetails)
 
         self.lblPlanTip = QLabel('')
-        self.lblPlanTip.setStyleSheet('font-size: 12px; color: #38bdf8;')
+        self.lblPlanTip.setStyleSheet('font-size: 11px; color: #38bdf8;')
         self.lblPlanTip.setWordWrap(True)
-        plan_layout.addWidget(self.lblPlanTip)
+        fmt_layout.addWidget(self.lblPlanTip)
 
-        main_layout.addWidget(self.planCard)
+        main_layout.addWidget(format_card)
 
         # 5. Dół: Konfiguracja (Źródło, Limit, Enkoder) i Akcje
         ctrl_card = QFrame()
         ctrl_card.setStyleSheet('background-color: #131d2e; border-radius: 8px; border: 1px solid #1e293b;')
         ctrl_layout = QVBoxLayout(ctrl_card)
-        ctrl_layout.setContentsMargins(12, 8, 12, 8)
-        ctrl_layout.setSpacing(7)
+        ctrl_layout.setContentsMargins(12, 7, 12, 7)
+        ctrl_layout.setSpacing(6)
 
         row_cfg = QHBoxLayout()
         self.btnSelect = QPushButton()
-        self.btnSelect.setStyleSheet('background-color: #2563eb; padding: 7px 14px;')
+        self.btnSelect.setStyleSheet('background-color: #2563eb; padding: 6px 12px;')
         self.btnSelect.clicked.connect(self.open_file)
         row_cfg.addWidget(self.btnSelect)
 
@@ -868,20 +960,20 @@ class CutGutApp(QMainWindow):
         row_cfg.addWidget(self.limitCombo)
 
         self.modeCombo = QComboBox()
-        self.modeCombo.setFixedWidth(210)
+        self.modeCombo.setFixedWidth(205)
         self.modeCombo.currentIndexChanged.connect(self.update_live_estimate)
         row_cfg.addWidget(self.modeCombo)
         ctrl_layout.addLayout(row_cfg)
 
         row_act = QHBoxLayout()
         self.btnCompress = QPushButton()
-        self.btnCompress.setStyleSheet('background-color: #2563eb; font-size: 13px; padding: 9px 18px; font-weight: bold;')
+        self.btnCompress.setStyleSheet('background-color: #2563eb; font-size: 13px; padding: 8px 18px; font-weight: bold;')
         self.btnCompress.setEnabled(False)
         self.btnCompress.clicked.connect(self.start_or_run_queue)
         row_act.addWidget(self.btnCompress, 2)
 
         self.btnAddToQueue = QPushButton()
-        self.btnAddToQueue.setStyleSheet('background-color: #0891b2; font-size: 12px; padding: 9px 12px;')
+        self.btnAddToQueue.setStyleSheet('background-color: #0891b2; font-size: 12px; padding: 8px 12px;')
         self.btnAddToQueue.setEnabled(False)
         self.btnAddToQueue.clicked.connect(self.add_to_queue)
         row_act.addWidget(self.btnAddToQueue, 1)
@@ -906,15 +998,16 @@ class CutGutApp(QMainWindow):
         self.queueLayout.addWidget(self.lblQueueHeader)
 
         self.queueTable = QTableWidget()
-        self.queueTable.setColumnCount(6)
-        self.queueTable.setHorizontalHeaderLabels(['Plik', 'Zakres', 'Limit', 'Jakość', 'Status', 'Akcja'])
+        self.queueTable.setColumnCount(7)
+        self.queueTable.setHorizontalHeaderLabels(['Plik', 'Kadr', 'Zakres', 'Limit', 'Enkoder', 'Status', 'Akcja'])
         self.queueTable.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.queueTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         self.queueTable.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self.queueTable.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         self.queueTable.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         self.queueTable.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
-        self.queueTable.setMaximumHeight(100)
+        self.queueTable.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
+        self.queueTable.setMaximumHeight(90)
         self.queueTable.cellClicked.connect(self.on_queue_table_clicked)
         self.queueLayout.addWidget(self.queueTable)
         self.queueContainer.setVisible(False)
@@ -922,7 +1015,7 @@ class CutGutApp(QMainWindow):
 
         # 7. Pasek postępu i status
         self.progBar = QProgressBar()
-        self.progBar.setFixedHeight(18)
+        self.progBar.setFixedHeight(16)
         main_layout.addWidget(self.progBar)
 
         self.statusLabel = QLabel()
@@ -938,7 +1031,6 @@ class CutGutApp(QMainWindow):
         self.positionSlider.sliderMoved.connect(self.set_position)
 
     def startup_maintenance(self):
-        # Usuń pozostałości po poprzednim update (.bak, .new, updater.bat)
         base_dir = encoder.get_base_dir()
         for f in ['CutGut.exe.bak', 'CutGut.exe.new', 'cutgut_updater.bat']:
             p = os.path.join(base_dir, f)
@@ -946,7 +1038,6 @@ class CutGutApp(QMainWindow):
                 try: os.remove(p)
                 except Exception: pass
 
-        # Sprawdź aktualizacje w tle, jeśli włączone
         if self.auto_check_updates:
             self.bg_update_worker = update_service.CheckUpdateWorker(__version__, self.include_prerelease)
             self.bg_update_worker.finished_signal.connect(self.on_background_update_found)
@@ -956,6 +1047,76 @@ class CutGutApp(QMainWindow):
         if rel:
             dlg = UpdateAvailableDialog(self, rel, __version__, self.current_lang)
             dlg.exec()
+
+    def on_crop_changed(self, cb: encoder.CropBox):
+        self.current_crop = cb
+        self.update_live_estimate()
+
+    def on_ratio_changed(self, idx: int):
+        ratios = ['original', '9:16', '1:1', '16:9']
+        r = ratios[idx] if idx < len(ratios) else 'original'
+        self.cropContainer.overlay.set_ratio_type(r)
+        self.alignBox.setVisible(r != 'original')
+        self.update_live_estimate()
+
+    def on_social_preset_changed(self, idx: int):
+        # ['Discord Clip (20 MB)', 'Discord Nitro (50 MB)', 'Shorts / TikTok HQ (50 MB)', 'Shorts Small (20 MB)', 'TikTok / Reels (50 MB)', 'Square Meme (20 MB)', 'Custom']
+        self.ratioCombo.blockSignals(True)
+        self.limitCombo.blockSignals(True)
+
+        if idx == 0: # Discord Clip (20 MB, 16:9)
+            self.ratioCombo.setCurrentIndex(0)
+            self.limitCombo.setCurrentIndex(0) # 20 MB
+            self.cropContainer.overlay.set_ratio_type('original')
+            self.alignBox.setVisible(False)
+        elif idx == 1: # Discord Nitro (50 MB, 16:9)
+            self.ratioCombo.setCurrentIndex(0)
+            self.limitCombo.setCurrentIndex(2) # 50 MB
+            self.cropContainer.overlay.set_ratio_type('original')
+            self.alignBox.setVisible(False)
+        elif idx == 2: # Shorts HQ (9:16, 50 MB)
+            self.ratioCombo.setCurrentIndex(1) # 9:16
+            self.limitCombo.setCurrentIndex(2) # 50 MB
+            self.cropContainer.overlay.set_ratio_type('9:16')
+            self.alignBox.setVisible(True)
+        elif idx == 3: # Shorts Small (9:16, 20 MB)
+            self.ratioCombo.setCurrentIndex(1) # 9:16
+            self.limitCombo.setCurrentIndex(0) # 20 MB
+            self.cropContainer.overlay.set_ratio_type('9:16')
+            self.alignBox.setVisible(True)
+        elif idx == 4: # TikTok / Reels (9:16, 50 MB)
+            self.ratioCombo.setCurrentIndex(1) # 9:16
+            self.limitCombo.setCurrentIndex(2) # 50 MB
+            self.cropContainer.overlay.set_ratio_type('9:16')
+            self.alignBox.setVisible(True)
+        elif idx == 5: # Square Meme (1:1, 20 MB)
+            self.ratioCombo.setCurrentIndex(2) # 1:1
+            self.limitCombo.setCurrentIndex(0) # 20 MB
+            self.cropContainer.overlay.set_ratio_type('1:1')
+            self.alignBox.setVisible(True)
+
+        self.ratioCombo.blockSignals(False)
+        self.limitCombo.blockSignals(False)
+        self.update_live_estimate()
+
+    def capture_png_frame(self):
+        if not self.input_file or not os.path.exists(self.input_file):
+            return
+
+        cur_time_s = self.mediaPlayer.position() / 1000.0
+        out_dir = self.custom_output_dir if self.custom_output_dir else encoder.get_default_output_dir()
+        base_name = os.path.splitext(os.path.basename(self.input_file))[0]
+        ts_str = time.strftime('%Y%m%d_%H%M%S')
+        png_path = os.path.join(out_dir, f"CutGut_{base_name}_{ts_str}_{int(cur_time_s*1000)}ms.png")
+
+        try:
+            crop = self.cropContainer.overlay.get_crop_box()
+            saved = encoder.extract_frame_png(self.input_file, cur_time_s, png_path, crop)
+            self.statusLabel.setText(self.t('screenshot_saved').format(path=os.path.basename(saved)))
+            if self.auto_open_folder:
+                os.startfile(out_dir)
+        except Exception as e:
+            QMessageBox.critical(self, "Błąd zrzutu klatki", str(e))
 
     def keyPressEvent(self, event):
         key = event.key()
@@ -1029,9 +1190,13 @@ class CutGutApp(QMainWindow):
         self.btnAddToQueue.setText(self.t('btn_add_queue'))
         self.btnCompress.setText(self.t('btn_compress'))
         self.btnCancel.setText(self.t('btn_cancel'))
+        self.btnScreenshot.setText(self.t('btn_screenshot'))
+        self.btnAlignLeft.setText(self.t('btn_align_left'))
+        self.btnAlignCenter.setText(self.t('btn_align_center'))
+        self.btnAlignRight.setText(self.t('btn_align_right'))
         self.lblPlanTitle.setText(f"📊 {self.t('plan_box_title')}")
         self.btnTestSample.setText(self.t('btn_test_sample'))
-        self.videoWidget.setToolTip(self.t('video_tooltip'))
+        self.cropContainer.setToolTip(self.t('video_tooltip'))
 
         self.update_range_text()
 
@@ -1039,6 +1204,23 @@ class CutGutApp(QMainWindow):
             self.statusLabel.setText(self.t('ready_status'))
             self.lblSourceFile.setText(self.t('lbl_no_file'))
 
+        # Social Presets
+        cur_soc_idx = max(self.socialCombo.currentIndex(), 0)
+        self.socialCombo.blockSignals(True)
+        self.socialCombo.clear()
+        self.socialCombo.addItems(self.t('social_presets'))
+        self.socialCombo.setCurrentIndex(cur_soc_idx)
+        self.socialCombo.blockSignals(False)
+
+        # Aspect Ratios
+        cur_rat_idx = max(self.ratioCombo.currentIndex(), 0)
+        self.ratioCombo.blockSignals(True)
+        self.ratioCombo.clear()
+        self.ratioCombo.addItems(self.t('aspect_ratios'))
+        self.ratioCombo.setCurrentIndex(cur_rat_idx)
+        self.ratioCombo.blockSignals(False)
+
+        # Presets MB
         cur_limit_idx = max(self.limitCombo.currentIndex(), 0)
         self.limitCombo.blockSignals(True)
         self.limitCombo.clear()
@@ -1049,6 +1231,7 @@ class CutGutApp(QMainWindow):
         self.limitCombo.setCurrentIndex(cur_limit_idx)
         self.limitCombo.blockSignals(False)
 
+        # Enkodery
         cur_mode_idx = max(self.modeCombo.currentIndex(), 0)
         self.modeCombo.blockSignals(True)
         self.modeCombo.clear()
@@ -1116,6 +1299,7 @@ class CutGutApp(QMainWindow):
             try:
                 self.video_info = encoder.probe_video(file_path)
                 self.video_fps = self.video_info.fps
+                self.cropContainer.overlay.set_video_dimensions(self.video_info.width, self.video_info.height)
             except Exception:
                 self.video_info = None
                 self.video_fps = 60.0
@@ -1124,6 +1308,7 @@ class CutGutApp(QMainWindow):
             self.btnCompress.setEnabled(True)
             self.btnAddToQueue.setEnabled(True)
             self.btnTestSample.setEnabled(True)
+            self.btnScreenshot.setEnabled(True)
             self.btnSelect.setText(self.t('btn_change_file'))
             self.lblSourceFile.setText(f"{os.path.basename(file_path)} ({self.video_info.width}x{self.video_info.height} @ {self.video_fps:.0f}fps)" if self.video_info else os.path.basename(file_path))
             self.statusLabel.setText(self.t('loaded_status').format(filename=os.path.basename(file_path)))
@@ -1198,14 +1383,17 @@ class CutGutApp(QMainWindow):
         target_mb = self.get_selected_target_mb()
         mode = self.get_selected_encoder_mode()
         is_hevc = (mode == 'CPU_HEVC')
+        crop = self.cropContainer.overlay.get_crop_box()
 
         plan = encoder.calculate_plan(
-            self.video_info, start_s, end_s, target_mb, is_hevc, self.input_file, self.current_lang
+            self.video_info, start_s, end_s, target_mb, is_hevc, self.input_file, self.current_lang, crop_box=crop
         )
         q: encoder.QualityAssessment = plan['quality']
 
         self.lblQualityBadge.setText(f"● {q.label}")
         self.lblQualityBadge.setStyleSheet(f"font-weight: bold; font-size: 13px; color: {q.color};")
+
+        crop_info = f" [Kadr: {crop.ratio_type}]" if crop.ratio_type != "original" else ""
 
         if plan['is_remux']:
             self.lblPlanDetails.setText(
@@ -1214,7 +1402,7 @@ class CutGutApp(QMainWindow):
         else:
             enc_name = self.modeCombo.currentText().replace('⚡ ', '').replace('🔴 ', '').replace('🚀 ', '').replace('⚖️ ', '').replace('💨 ', '').replace('💎 ', '')
             self.lblPlanDetails.setText(
-                f"{plan['out_width']}×{plan['out_height']} · {plan['out_fps']:.0f} FPS · {enc_name} · ~{plan['video_kbps']} kbps · Cel: ~{plan['target_bytes']/1000000:.1f} MB (Limit: {target_mb:.1f} MB)"
+                f"{plan['out_width']}×{plan['out_height']}{crop_info} · {plan['out_fps']:.0f} FPS · {enc_name} · ~{plan['video_kbps']} kbps · Cel: ~{plan['target_bytes']/1000000:.1f} MB (Limit: {target_mb:.1f} MB)"
             )
 
         tip_text = f"<b>{q.description}</b>"
@@ -1231,9 +1419,10 @@ class CutGutApp(QMainWindow):
         target_mb = self.get_selected_target_mb()
         mode = self.get_selected_encoder_mode()
         is_hevc = (mode == 'CPU_HEVC')
+        crop = self.cropContainer.overlay.get_crop_box()
 
         plan = encoder.calculate_plan(
-            self.video_info, start_s, end_s, target_mb, is_hevc, self.input_file, self.current_lang
+            self.video_info, start_s, end_s, target_mb, is_hevc, self.input_file, self.current_lang, crop_box=crop
         )
 
         if plan['is_remux']:
@@ -1248,13 +1437,14 @@ class CutGutApp(QMainWindow):
             input_path=self.input_file,
             center_s=cur_center_s,
             plan=plan,
-            preset_mode=mode
+            preset_mode=mode,
+            crop_box=crop
         )
-        self.sample_worker.finished_signal.connect(lambda sp: self.on_sample_preview_finished(sp, cur_center_s, plan, mode))
+        self.sample_worker.finished_signal.connect(lambda sp: self.on_sample_preview_finished(sp, cur_center_s, plan, mode, crop))
         self.sample_worker.error_signal.connect(self.on_sample_preview_error)
         self.sample_worker.start()
 
-    def on_sample_preview_finished(self, sample_path: str, center_s: float, plan: dict, mode: str):
+    def on_sample_preview_finished(self, sample_path: str, center_s: float, plan: dict, mode: str, crop: Optional[encoder.CropBox]):
         self.btnTestSample.setEnabled(True)
         self.statusLabel.setText(self.t('sample_done'))
 
@@ -1275,7 +1465,8 @@ class CutGutApp(QMainWindow):
             is_sample=True,
             plan=plan,
             preset_mode=mode,
-            cleanup_policy="never"
+            cleanup_policy="never",
+            crop_box=crop
         )
         self.open_ab_comparison(res)
 
@@ -1290,7 +1481,6 @@ class CutGutApp(QMainWindow):
         self.comparison_dialog.show()
 
     def on_comparison_closed(self, result: encoder.ExportResult):
-        # Dopiero po zamknięciu okna A/B uruchamiamy politykę czyszczenia oryginału
         if not result.is_sample and result.cleanup_policy != "never":
             self.execute_cleanup_policy(result.input_path, result.output_path, result.cleanup_policy)
 
@@ -1360,7 +1550,9 @@ class CutGutApp(QMainWindow):
 
         out_dir = self.custom_output_dir if self.custom_output_dir else encoder.get_default_output_dir()
         base_name = os.path.splitext(os.path.basename(self.input_file))[0]
-        output_file = encoder.generate_output_filepath(output_dir=out_dir, base_name=base_name)
+        crop = self.cropContainer.overlay.get_crop_box()
+        crop_tag = f"_{crop.ratio_type.replace(':', '_')}" if crop.ratio_type != "original" else ""
+        output_file = encoder.generate_output_filepath(output_dir=out_dir, base_name=f"{base_name}{crop_tag}")
 
         job = encoder.EncodeJob(
             job_id=str(int(time.time() * 1000)),
@@ -1370,7 +1562,8 @@ class CutGutApp(QMainWindow):
             end_s=end_s,
             target_mb=self.get_selected_target_mb(),
             preset_mode=self.get_selected_encoder_mode(),
-            cleanup_policy=self.cleanup_policy
+            cleanup_policy=self.cleanup_policy,
+            crop_box=crop
         )
         self.queue.append(job)
         self.update_queue_table()
@@ -1387,9 +1580,11 @@ class CutGutApp(QMainWindow):
 
         for row, job in enumerate(self.queue):
             self.queueTable.setItem(row, 0, QTableWidgetItem(os.path.basename(job.input_path)))
-            self.queueTable.setItem(row, 1, QTableWidgetItem(f"{job.start_s:.1f}s - {job.end_s:.1f}s"))
-            self.queueTable.setItem(row, 2, QTableWidgetItem(f"{job.target_mb:.0f} MB"))
-            self.queueTable.setItem(row, 3, QTableWidgetItem(job.preset_mode))
+            crop_txt = job.crop_box.ratio_type if (job.crop_box and job.crop_box.ratio_type != "original") else "16:9"
+            self.queueTable.setItem(row, 1, QTableWidgetItem(crop_txt))
+            self.queueTable.setItem(row, 2, QTableWidgetItem(f"{job.start_s:.1f}s - {job.end_s:.1f}s"))
+            self.queueTable.setItem(row, 3, QTableWidgetItem(f"{job.target_mb:.0f} MB"))
+            self.queueTable.setItem(row, 4, QTableWidgetItem(job.preset_mode))
             
             st_text = job.status
             if job.status == 'pending': st_text = '⏳ Oczekuje' if self.current_lang == 'pl' else '⏳ Pending'
@@ -1397,24 +1592,24 @@ class CutGutApp(QMainWindow):
             elif job.status == 'finished': st_text = '✅ Gotowe' if self.current_lang == 'pl' else '✅ Done'
             elif job.status == 'error': st_text = '❌ Błąd' if self.current_lang == 'pl' else '❌ Error'
             elif job.status == 'cancelled': st_text = '🛑 Anulowano' if self.current_lang == 'pl' else '🛑 Cancelled'
-            self.queueTable.setItem(row, 4, QTableWidgetItem(st_text))
+            self.queueTable.setItem(row, 5, QTableWidgetItem(st_text))
 
             act_text = 'A/B Podgląd' if job.status == 'finished' else 'Usuń'
             item_act = QTableWidgetItem(act_text)
             item_act.setForeground(QColor('#60a5fa' if job.status == 'finished' else '#f87171'))
-            self.queueTable.setItem(row, 5, item_act)
+            self.queueTable.setItem(row, 6, item_act)
 
     def on_queue_table_clicked(self, row: int, col: int):
         if row < 0 or row >= len(self.queue):
             return
         job = self.queue[row]
 
-        if col == 5:
+        if col == 6:
             if job.status == 'finished' and os.path.exists(job.output_path):
                 dur_s = max(job.end_s - job.start_s, 0.1)
                 try: info = encoder.probe_video(job.input_path)
                 except Exception: info = None
-                plan = encoder.calculate_plan(info, job.start_s, job.end_s, job.target_mb, (job.preset_mode == 'CPU_HEVC'), job.input_path, self.current_lang) if info else None
+                plan = encoder.calculate_plan(info, job.start_s, job.end_s, job.target_mb, (job.preset_mode == 'CPU_HEVC'), job.input_path, self.current_lang, crop_box=job.crop_box) if info else None
 
                 res = encoder.ExportResult(
                     input_path=job.input_path,
@@ -1428,7 +1623,8 @@ class CutGutApp(QMainWindow):
                     is_sample=False,
                     plan=plan,
                     preset_mode=job.preset_mode,
-                    cleanup_policy="never"
+                    cleanup_policy="never",
+                    crop_box=job.crop_box
                 )
                 self.open_ab_comparison(res)
             elif job.status in ('pending', 'cancelled', 'error'):
@@ -1474,7 +1670,8 @@ class CutGutApp(QMainWindow):
             start_s=job.start_s,
             end_s=job.end_s,
             target_mb=job.target_mb,
-            mode=job.preset_mode
+            mode=job.preset_mode,
+            crop_box=job.crop_box
         )
         self.worker.progress_signal.connect(self.on_worker_progress)
         self.worker.finished_signal.connect(self.on_worker_finished)
@@ -1517,12 +1714,11 @@ class CutGutApp(QMainWindow):
             if os.path.exists(out_dir):
                 os.startfile(out_dir)
 
-        # Przygotuj ExportResult
         if cur_job:
             dur_s = max(cur_job.end_s - cur_job.start_s, 0.1)
             try: info = encoder.probe_video(cur_job.input_path)
             except Exception: info = None
-            plan = encoder.calculate_plan(info, cur_job.start_s, cur_job.end_s, cur_job.target_mb, (cur_job.preset_mode == 'CPU_HEVC'), cur_job.input_path, self.current_lang) if info else None
+            plan = encoder.calculate_plan(info, cur_job.start_s, cur_job.end_s, cur_job.target_mb, (cur_job.preset_mode == 'CPU_HEVC'), cur_job.input_path, self.current_lang, crop_box=cur_job.crop_box) if info else None
 
             res = encoder.ExportResult(
                 input_path=cur_job.input_path,
@@ -1536,7 +1732,8 @@ class CutGutApp(QMainWindow):
                 is_sample=False,
                 plan=plan,
                 preset_mode=cur_job.preset_mode,
-                cleanup_policy=cur_job.cleanup_policy
+                cleanup_policy=cur_job.cleanup_policy,
+                crop_box=cur_job.crop_box
             )
 
             if self.auto_ab_compare:
@@ -1544,7 +1741,6 @@ class CutGutApp(QMainWindow):
             elif cur_job.cleanup_policy != "never":
                 self.execute_cleanup_policy(cur_job.input_path, out_path, cur_job.cleanup_policy)
 
-        # Kolejne zadanie z kolejki
         self.process_next_job()
 
     def on_worker_error(self, err_msg: str):

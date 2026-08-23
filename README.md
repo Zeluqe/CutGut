@@ -1,30 +1,38 @@
 # ✂️ CutGut
 
-[![Version](https://img.shields.io/badge/version-202608230--4--0-blue.svg)](https://github.com/Zeluqe/CutGut/releases/tag/202608230-4-0)
+[![Version](https://img.shields.io/badge/version-202608230--5--0-blue.svg)](https://github.com/Zeluqe/CutGut/releases/tag/202608230-5-0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://www.python.org/)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-Supported-red.svg)](https://ffmpeg.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)]()
 
-[![Download CutGut.exe](https://img.shields.io/badge/Download-CutGut.exe%20(Build%20202608230--4--0)-2563eb?logo=windows&style=for-the-badge)](https://github.com/Zeluqe/CutGut/releases/download/202608230-4-0/CutGut.exe)
+[![Download CutGut.exe](https://img.shields.io/badge/Download-CutGut.exe%20(Build%20202608230--5--0)-2563eb?logo=windows&style=for-the-badge)](https://github.com/Zeluqe/CutGut/releases/download/202608230-5-0/CutGut.exe)
 
-> **High-precision video trimming and smart compression tool tailored for Discord (20 MB free tier, 50 MB / 500 MB Nitro), Messenger, and social uploads.**
+> **High-precision video trimming, interactive social framing/cropping, and smart compression tool tailored for Discord (20 MB free tier, 50 MB / 500 MB Nitro), YouTube Shorts, TikTok, Reels, and social uploads.**
 
-CutGut provides frame-accurate video clipping, real-time quality grading (bppf), dedicated side-by-side A/B video player comparison, 1-click in-app auto-updates, on-demand quality preview samples, custom output directory management, safe source recycling policies, hardware-accelerated **NVIDIA NVENC** & **AMD AMF** GPU encoding, task queue batch processing, and 2-pass rate control.
+CutGut provides frame-accurate video clipping, interactive visual framing & cropping (9:16 Shorts, 1:1 Square, 16:9), 1-click lossless PNG frame capture, social export presets, real-time quality grading (bppf), dedicated side-by-side A/B video player comparison, 1-click in-app auto-updates, custom output directory management, safe source recycling policies, hardware-accelerated **NVIDIA NVENC** & **AMD AMF** GPU encoding, task queue batch processing, and 2-pass rate control.
 
 ---
 
 ## 🌟 Key Features
 
+- 📱 **Interactive Framing & Crop Presets (`CropOverlay` / `CropBox`)**:
+  - **Vertical 9:16**: Instant conversion of gameplay/widescreen videos into YouTube Shorts, TikTok, and Instagram Reels.
+  - **Square 1:1**: Crop to square for Discord, social posts, and memes.
+  - **Horizontal 16:9 & Original**: Full widescreen preservation.
+  - **Interactive Drag & Align**: Move the semi-transparent framing box directly with your mouse over the live video, or use 1-click alignment buttons (`[ ◀ Lewo ]`, `[ 🎯 Środek ]`, `[ Prawo ▶ ]`).
+- 📸 **Lossless PNG Frame Capture (`extract_frame_png`)**:
+  - Click `[ 📸 Klatka PNG ]` to instantly extract and save the current video frame as a full-resolution PNG to the output directory (respecting any active crop).
+- 🎯 **Social Export Profiles**:
+  - **Discord Clip (20 MB)**, **Discord Nitro (50 MB)**, **Shorts / TikTok HQ (50 MB)**, **Shorts Small (20 MB)**, **TikTok / Reels (50 MB)**, **Square Meme (20 MB)**, and **Custom**.
 - 🚀 **1-Click In-App Auto-Updates (`update_service.py`)**:
   - Automatically queries official GitHub Releases in the background.
   - One-click seamless update and restart replacing `CutGut.exe` with backup (`.bak`) safety.
-  - Strict release parsing and SHA-256 verification.
 - 👥 **Dedicated Side-by-Side A/B Quality Comparison Window (`QualityComparisonDialog`)**:
   - Non-blocking separate comparison window displaying the trimmed original vs. the compressed output / quality sample.
   - Single synchronized timeline and play/pause controls with automated drift correction (every 250ms).
   - Frame-by-frame stepping controls (`◀ -1s`, `◀ -1 fr`, `+1 fr ▶`, `+1s ▶`).
-  - **Deferred Source File Cleanup**: Source cleanup policies only execute after the user closes the A/B comparison window, guaranteeing original footage is always available for inspection.
+  - **Deferred Source File Cleanup**: Source cleanup policies only execute after the user closes the A/B comparison window.
 - 🔬 **Quality Preview Sample (`create_quality_preview`)**:
   - Test the actual encoded video quality on dynamic scenes (smoke, teamfights, motion) before running the full export with `[ 🔬 Sprawdź jakość w tym momencie ]`.
   - Encodes a rapid 6-second sample with exact resolution, bitrate, filters, and encoder presets into `temp/`.

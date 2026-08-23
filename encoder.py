@@ -13,7 +13,7 @@ from enum import Enum
 from dataclasses import dataclass
 from typing import Optional, Callable
 
-__version__ = "202608230-4-0"
+__version__ = "202608230-5-0"
 
 CREATE_NO_WINDOW = 0x08000000 if os.name == 'nt' else 0
 
@@ -83,6 +83,98 @@ def generate_output_filepath(output_dir: str = '', base_name: str = '') -> str:
     while os.path.exists(os.path.join(target_dir, f"{root}_{counter}{ext}")):
         counter += 1
     return os.path.join(target_dir, f"{root}_{counter}{ext}")
+
+@dataclass
+class CropBox:
+    x: int
+    y: int
+    w: int
+    h: int
+    ratio_type: str = "original"  # "original", "16:9", "9:16", "1:1", "custom"
+
+    def to_filter(self) -> str:
+        w_even = self.w if self.w % 2 == 0 else self.w - 1
+        h_even = self.h if self.h % 2 == 0 else self.h - 1
+        x_even = self.x if self.x % 2 == 0 else self.x - 1
+        y_even = self.y if self.y % 2 == 0 else self.y - 1
+        return f"crop={w_even}:{h_even}:{max(x_even, 0)}:{max(y_even, 0)}"
+
+def calculate_default_crop(src_w: int, src_h: int, ratio_type: str, alignment: str = "center") -> CropBox:
+    if ratio_type == "original" or src_w <= 0 or src_h <= 0:
+        return CropBox(0, 0, src_w, src_h, "original")
+        
+    if ratio_type == "16:9":
+        target_aspect = 16.0 / 9.0
+        src_aspect = src_w / float(src_h)
+        if abs(src_aspect - target_aspect) < 0.02:
+            return CropBox(0, 0, src_w, src_h, "16:9")
+        if src_aspect > target_aspect:
+            w = int(src_h * target_aspect)
+            h = src_h
+        else:
+            w = src_w
+            h = int(src_w / target_aspect)
+    elif ratio_type == "9:16":
+        target_aspect = 9.0 / 16.0
+        w = int(src_h * target_aspect)
+        h = src_h
+        if w > src_w:
+            w = src_w
+            h = int(src_w / target_aspect)
+    elif ratio_type == "1:1":
+        side = min(src_w, src_h)
+        w = side
+        h = side
+    else:
+        return CropBox(0, 0, src_w, src_h, ratio_type)
+
+    w = w if w % 2 == 0 else w - 1
+    h = h if h % 2 == 0 else h - 1
+
+    # Wyrównanie poziome
+    if alignment == "left":
+        x = 0
+    elif alignment == "right":
+        x = max(src_w - w, 0)
+    else: # center
+        x = max((src_w - w) // 2, 0)
+
+    y = max((src_h - h) // 2, 0)
+    return CropBox(x=x, y=y, w=w, h=h, ratio_type=ratio_type)
+
+def extract_frame_png(
+    input_path: str,
+    timestamp_s: float,
+    output_path: str,
+    crop_box: Optional[CropBox] = None
+) -> str:
+    if not os.path.exists(input_path):
+        raise FileNotFoundError(f"Nie znaleziono pliku: {input_path}")
+        
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    ffmpeg_exe = get_ffmpeg_path()
+    
+    cmd = [
+        ffmpeg_exe, '-y',
+        '-ss', f"{max(timestamp_s, 0.0):.3f}",
+        '-i', input_path
+    ]
+    
+    if crop_box and crop_box.ratio_type != "original":
+        cmd.extend(['-vf', crop_box.to_filter()])
+        
+    cmd.extend([
+        '-vframes', '1',
+        '-q:v', '1',
+        output_path
+    ])
+    
+    res = subprocess.run(cmd, capture_output=True, creationflags=CREATE_NO_WINDOW)
+    if res.returncode != 0 or not os.path.exists(output_path):
+        err_msg = res.stderr.decode('utf-8', errors='ignore')
+        raise RuntimeError(f"Błąd ekstrakcji klatki PNG: {err_msg}")
+        
+    return output_path
 
 class SourceCleanupPolicy(str, Enum):
     NEVER = "never"
@@ -555,7 +647,8 @@ def calculate_plan(
     target_mb: float,
     is_hevc: bool = False,
     input_path: str = '',
-    lang: str = 'pl'
+    lang: str = 'pl',
+    crop_box: Optional[CropBox] = None
 ):
     dur_s = max(end_s - start_s, 0.1)
     
@@ -563,7 +656,8 @@ def calculate_plan(
     target_bytes = calculate_target_bytes(target_mb)
     
     # 2. Sprawdz czy mozliwy jest bezstratny i natychmiastowy Remux (Stream Copy)
-    is_remux = can_stream_copy(video_info, input_path, start_s, end_s, target_mb) if input_path else False
+    has_crop = crop_box is not None and crop_box.ratio_type != "original" and (crop_box.w < video_info.width or crop_box.h < video_info.height)
+    is_remux = False if has_crop else (can_stream_copy(video_info, input_path, start_s, end_s, target_mb) if input_path else False)
     
     # 3. Narzut audio i kontenera
     audio_bps = 96000 if is_hevc else 128000
@@ -574,24 +668,32 @@ def calculate_plan(
     
     # 4. Inteligentne skalowanie i klatkaz
     filters = []
-    out_height = video_info.height
-    out_width = video_info.width
+    if has_crop:
+        filters.append(crop_box.to_filter())
+        base_w = crop_box.w
+        base_h = crop_box.h
+    else:
+        base_w = video_info.width
+        base_h = video_info.height
+
+    out_height = base_h
+    out_width = base_w
     out_fps = video_info.fps
     
     if video_kbps < 450:
-        if video_info.height > 480:
+        if base_h > 480:
             filters.append('scale=-2:480')
             out_height = 480
-            out_width = int(video_info.width * 480 / video_info.height) if video_info.height > 0 else 854
+            out_width = int(base_w * 480 / base_h) if base_h > 0 else 854
             out_width = out_width if out_width % 2 == 0 else out_width + 1
         if video_info.fps > 30:
             filters.append('fps=30')
             out_fps = 30.0
     elif video_kbps < 900:
-        if video_info.height > 720:
+        if base_h > 720:
             filters.append('scale=-2:720')
             out_height = 720
-            out_width = int(video_info.width * 720 / video_info.height) if video_info.height > 0 else 1280
+            out_width = int(base_w * 720 / base_h) if base_h > 0 else 1280
             out_width = out_width if out_width % 2 == 0 else out_width + 1
         if video_info.fps > 45:
             filters.append('fps=30')
@@ -622,7 +724,8 @@ def calculate_plan(
         'out_width': out_width,
         'out_height': out_height,
         'out_fps': out_fps,
-        'quality': quality
+        'quality': quality,
+        'crop_box': crop_box
     }
 
 def encode_video(
@@ -633,7 +736,8 @@ def encode_video(
     target_mb: float = 20.0,
     preset_mode: str = 'NVENC_HQ',  # 'NVENC_HQ', 'NVENC_FAST', 'CPU_BALANCED', 'CPU_FAST', 'CPU_HEVC'
     progress_callback: Optional[Callable[[ProgressUpdate], None]] = None,
-    cancel_token: Optional[CancellationToken] = None
+    cancel_token: Optional[CancellationToken] = None,
+    crop_box: Optional[CropBox] = None
 ) -> str:
     if not os.path.exists(input_path):
         raise FileNotFoundError(f'Nie znaleziono pliku wejsciowego: {input_path}')
@@ -651,7 +755,7 @@ def encode_video(
     elif preset_mode in ('AMF_HQ', 'AMF_FAST') and not check_amf_support():
         preset_mode = 'NVENC_HQ' if check_nvenc_support() else 'CPU_BALANCED'
 
-    plan = calculate_plan(video_info, start_s, end_s, target_mb, is_hevc, input_path)
+    plan = calculate_plan(video_info, start_s, end_s, target_mb, is_hevc, input_path, crop_box=crop_box)
     dur_s = plan['duration_s']
     v_kbps = plan['video_kbps']
     a_kbps = plan['audio_kbps']
