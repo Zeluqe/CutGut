@@ -12,7 +12,7 @@ if hasattr(sys.stderr, 'reconfigure'):
 
 import encoder
 
-__version__ = "202608230-5-2"
+__version__ = "202608230-5-3"
 
 def parse_target_mb(val: str) -> float:
     v = val.lower().replace('mb', '').replace('m', '').strip()

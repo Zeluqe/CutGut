@@ -13,7 +13,7 @@ from enum import Enum
 from dataclasses import dataclass
 from typing import Optional, Callable
 
-__version__ = "202608230-5-2"
+__version__ = "202608230-5-3"
 
 CREATE_NO_WINDOW = 0x08000000 if os.name == 'nt' else 0
 

@@ -86,7 +86,7 @@ class SamplePreviewWorker(QThread):
     def cancel(self):
         self.cancel_token.cancel()
 
-__version__ = "202608230-5-2"
+__version__ = "202608230-5-3"
 
 TRANSLATIONS = {
     'pl': {
@@ -737,7 +737,7 @@ class CutGutApp(QMainWindow):
         self.cropContainer.crop_changed_signal.connect(self.on_crop_changed)
         
         self.audioOutput = QAudioOutput()
-        self.mediaPlayer.setVideoOutput(self.cropContainer.video_widget)
+        self.mediaPlayer.setVideoSink(self.cropContainer.sink)
         self.mediaPlayer.setAudioOutput(self.audioOutput)
         self.audioOutput.setVolume(0.7)
 
