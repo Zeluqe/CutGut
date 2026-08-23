@@ -1,26 +1,36 @@
 # ✂️ CutGut
 
-[![Version](https://img.shields.io/badge/version-202608240--5--4-blue.svg)](https://github.com/Zeluqe/CutGut/releases/tag/202608240-5-4)
+[![Version](https://img.shields.io/badge/version-202608240--6--0-blue.svg)](https://github.com/Zeluqe/CutGut/releases/tag/202608240-6-0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://www.python.org/)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-Supported-red.svg)](https://ffmpeg.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)]()
 
-[![Download CutGut.exe](https://img.shields.io/badge/Download-CutGut.exe%20(Build%20202608240--5--4)-2563eb?logo=windows&style=for-the-badge)](https://github.com/Zeluqe/CutGut/releases/download/202608240-5-4/CutGut.exe)
+[![Download CutGut.exe](https://img.shields.io/badge/Download-CutGut.exe%20(Build%20202608240--6--0)-2563eb?logo=windows&style=for-the-badge)](https://github.com/Zeluqe/CutGut/releases/download/202608240-6-0/CutGut.exe)
 
-> **High-precision video trimming, interactive social framing/cropping, and smart compression tool tailored for Discord (20 MB free tier, 50 MB / 500 MB Nitro), YouTube Shorts, TikTok, Reels, and social uploads.**
+> **Modern Windows 11 Fluent UI video trimming, interactive social framing/cropping, and smart compression tool tailored for Discord (20 MB free tier, 50 MB / 500 MB Nitro), YouTube Shorts, TikTok, Reels, and social uploads.**
 
-CutGut provides frame-accurate video clipping, interactive visual framing & cropping (9:16 Shorts, 1:1 Square, 16:9), 1-click lossless PNG frame capture, social export presets, real-time quality grading (bppf), dedicated side-by-side A/B video player comparison, 1-click in-app auto-updates, custom output directory management, safe source recycling policies, hardware-accelerated **NVIDIA NVENC** & **AMD AMF** GPU encoding, task queue batch processing, and 2-pass rate control.
+CutGut provides frame-accurate video clipping, Windows 11 Fluent UI aesthetic, rich interactive timeline with IN/OUT markers and range highlighting, hardware-accelerated video canvas with dimmed 9:16/1:1 crop overlays, 1-click lossless PNG frame capture, social export presets, real-time quality grading (bppf), dedicated side-by-side A/B video player comparison, 1-click in-app auto-updates, custom output directory management, safe source recycling policies, hardware-accelerated **NVIDIA NVENC** & **AMD AMF** GPU encoding, task queue batch processing, and 2-pass rate control.
 
 ---
 
 ## 🌟 Key Features
 
+- 🎨 **Windows 11 / Fluent UI Redesign (Wave 6 - `202608240-6-0`)**:
+  - Dark graphite card architecture (`#141416` / `#1c1c1f`) with subtle 1px borders and 8–10px rounded corners.
+  - Native Windows 11 DWM immersive dark title bar and rounded window corner integration.
+  - Clear visual hierarchy: **Export Configuration** and **Quality Assessment** split into balanced responsive columns.
+  - Primary button accenting with distinct Windows Blue (`#0078d4`) styling.
+- ⏱️ **Rich Interactive Fluent Timeline (`FluentTimelineWidget`)**:
+  - Distinct time track with translucent Fluent blue selection range.
+  - Visual green (IN) and red (OUT) markers with drag & drop adjustments.
+  - Floating timestamp tooltip (`MM:SS.ms`) on hover and scrubbing.
+  - Subtle floating toast notifications for instant user feedback.
 - 📱 **Interactive Framing & Crop Presets (`CropOverlay` / `CropBox`)**:
-  - **Vertical 9:16**: Instant conversion of gameplay/widescreen videos into YouTube Shorts, TikTok, and Instagram Reels.
+  - **Vertical 9:16**: Instant conversion of gameplay/widescreen videos into YouTube Shorts, TikTok, and Instagram Reels with dark dimmed vignette outside the active frame.
   - **Square 1:1**: Crop to square for Discord, social posts, and memes.
   - **Horizontal 16:9 & Original**: Full widescreen preservation.
-  - **Interactive Drag & Align**: Move the semi-transparent framing box directly with your mouse over the live video, or use 1-click alignment buttons (`[ ◀ Lewo ]`, `[ 🎯 Środek ]`, `[ Prawo ▶ ]`).
+  - **Interactive Drag & Align**: Move the framing box directly with your mouse over the live video, or use 1-click alignment buttons (`[ ◀ Lewo ]`, `[ 🎯 Środek ]`, `[ Prawo ▶ ]`).
 - 📸 **Lossless PNG Frame Capture (`extract_frame_png`)**:
   - Click `[ 📸 Klatka PNG ]` to instantly extract and save the current video frame as a full-resolution PNG to the output directory (respecting any active crop).
 - 🎯 **Social Export Profiles**:
