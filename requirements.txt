@@ -1,0 +1,4 @@
+PyQt6>=6.6.0
+PyQt6-Qt6>=6.6.0
+customtkinter>=5.2.0
+gradio>=4.0.0
