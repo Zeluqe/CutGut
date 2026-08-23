@@ -29,9 +29,9 @@ def main():
     parser.add_argument('-t', '--target', default='20mb', help='Docelowy limit rozmiaru: 20mb (domyslnie), 10mb, 50mb, 500mb lub liczba MB')
     parser.add_argument(
         '--encoder',
-        choices=['nvenc', 'nvenc_fast', 'cpu', 'cpu_fast', 'hevc'],
+        choices=['nvenc', 'nvenc_fast', 'amf', 'amf_fast', 'cpu', 'cpu_fast', 'hevc'],
         default=None,
-        help='Wybierz enkoder: nvenc (NVIDIA GPU HQ), nvenc_fast, cpu (libx264 balanced), cpu_fast, hevc (libx265)'
+        help='Wybierz enkoder: nvenc (NVIDIA GPU HQ), nvenc_fast, amf (AMD GPU HQ), amf_fast, cpu (libx264 balanced), cpu_fast, hevc (libx265)'
     )
     parser.add_argument('-o', '--output', default=None, help='Sciezka do pliku wyjsciowego')
 
@@ -58,19 +58,20 @@ def main():
     target_mb = parse_target_mb(args.target)
     
     # Mapowanie wyboru enkodera
-    nvenc_ok = encoder.check_nvenc_support()
     enc_map = {
         'nvenc': 'NVENC_HQ',
         'nvenc_fast': 'NVENC_FAST',
+        'amf': 'AMF_HQ',
+        'amf_fast': 'AMF_FAST',
         'cpu': 'CPU_BALANCED',
         'cpu_fast': 'CPU_FAST',
         'hevc': 'CPU_HEVC'
     }
     
     if args.encoder:
-        preset_mode = enc_map.get(args.encoder, 'NVENC_HQ')
+        preset_mode = enc_map.get(args.encoder, 'CPU_BALANCED')
     else:
-        preset_mode = 'NVENC_HQ' if nvenc_ok else 'CPU_BALANCED'
+        preset_mode = encoder.get_best_available_encoder()
 
     if not args.output:
         out_dir = os.path.join(encoder.get_base_dir(), 'outputs')

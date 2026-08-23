@@ -7,8 +7,10 @@ import re
 import shutil
 import urllib.request
 import zipfile
+import functools
 from dataclasses import dataclass
 from typing import Optional, Callable
+
 
 CREATE_NO_WINDOW = 0x08000000 if os.name == 'nt' else 0
 
@@ -209,6 +211,7 @@ def _fallback_probe(file_path: str) -> VideoInfo:
         audio_codec=audio_codec
     )
 
+@functools.lru_cache(maxsize=1)
 def check_nvenc_support() -> bool:
     try:
         cmd = [get_ffmpeg_path(), '-y', '-f', 'lavfi', '-i', 'testsrc=duration=0.1:size=320x240:rate=1', '-c:v', 'h264_nvenc', '-f', 'null', '-']
@@ -216,6 +219,22 @@ def check_nvenc_support() -> bool:
         return res.returncode == 0
     except Exception:
         return False
+
+@functools.lru_cache(maxsize=1)
+def check_amf_support() -> bool:
+    try:
+        cmd = [get_ffmpeg_path(), '-y', '-f', 'lavfi', '-i', 'testsrc=duration=0.1:size=320x240:rate=1', '-c:v', 'h264_amf', '-f', 'null', '-']
+        res = subprocess.run(cmd, capture_output=True, creationflags=CREATE_NO_WINDOW)
+        return res.returncode == 0
+    except Exception:
+        return False
+
+def get_best_available_encoder() -> str:
+    if check_nvenc_support():
+        return 'NVENC_HQ'
+    if check_amf_support():
+        return 'AMF_HQ'
+    return 'CPU_BALANCED'
 
 def calculate_target_bytes(target_mb: float) -> int:
     # Dual-Limit Math: bezpieczenstwo dla limitow binarnych (MiB) i dziesietnych (MB)
@@ -280,9 +299,11 @@ def encode_video(
     video_info = probe_video(input_path)
     is_hevc = (preset_mode == 'CPU_HEVC')
     
-    # Auto-fallback do CPU jesli brak NVENC
+    # Auto-fallback sprzetowy (NVENC -> AMF -> CPU)
     if preset_mode in ('NVENC_HQ', 'NVENC_FAST') and not check_nvenc_support():
-        preset_mode = 'CPU_BALANCED'
+        preset_mode = 'AMF_HQ' if check_amf_support() else 'CPU_BALANCED'
+    elif preset_mode in ('AMF_HQ', 'AMF_FAST') and not check_amf_support():
+        preset_mode = 'NVENC_HQ' if check_nvenc_support() else 'CPU_BALANCED'
 
     plan = calculate_plan(video_info, start_s, end_s, target_mb, is_hevc)
     dur_s = plan['duration_s']
@@ -293,6 +314,7 @@ def encode_video(
     unique_id = int(time.time() * 1000)
     base_dir = get_base_dir()
     stats_file = os.path.join(base_dir, f'ffmpeg2pass_{unique_id}')
+    stats_file_hevc = stats_file.replace('\\', '/')
 
     # Klatkowa dokladnosc: -i przed -ss / -to
     common_args = ['-i', input_path, '-ss', str(start_s), '-to', str(end_s)]
@@ -322,25 +344,43 @@ def encode_video(
             ]
             _run_ffmpeg_with_progress(cmd, dur_s, 'Kompresja GPU (NVIDIA NVENC)', progress_callback, cancel_token)
 
-        else:
-            codec = 'libx265' if preset_mode == 'CPU_HEVC' else 'libx264'
-            cpu_preset = 'veryfast' if preset_mode == 'CPU_FAST' else 'slow'
+        elif preset_mode in ('AMF_HQ', 'AMF_FAST'):
+            quality_mode = 'quality' if preset_mode == 'AMF_HQ' else 'speed'
+            cmd = [
+                ffmpeg_bin, '-y', '-hide_banner',
+                '-progress', 'pipe:1'
+            ] + common_args + vf_args + [
+                '-c:v', 'h264_amf',
+                '-usage', 'transcoding',
+                '-quality', quality_mode,
+                '-rc', 'vbr_peak',
+                '-b:v', f'{v_kbps}k',
+                '-maxrate', f'{int(v_kbps * 1.25)}k',
+                '-bufsize', f'{int(v_kbps * 2.0)}k',
+                '-pix_fmt', 'yuv420p',
+                '-c:a', 'aac',
+                '-b:a', f'{a_kbps}k',
+                '-movflags', '+faststart',
+                output_path
+            ]
+            _run_ffmpeg_with_progress(cmd, dur_s, 'Kompresja GPU (AMD AMF)', progress_callback, cancel_token)
 
+        elif preset_mode == 'CPU_HEVC':
+            # Dedykowany 2-pass x265 przez -x265-params
             # Pass 1
             cmd_pass1 = [
                 ffmpeg_bin, '-y', '-hide_banner',
                 '-progress', 'pipe:1'
             ] + common_args + vf_args + [
-                '-c:v', codec,
+                '-c:v', 'libx265',
                 '-b:v', f'{v_kbps}k',
-                '-preset', cpu_preset,
-                '-pass', '1',
-                '-passlogfile', stats_file,
+                '-preset', 'slow',
+                '-x265-params', f'pass=1:stats={stats_file_hevc}',
                 '-an',
                 '-f', 'null',
                 '-'
             ]
-            _run_ffmpeg_with_progress(cmd_pass1, dur_s, 'Analiza wideo (Przebieg 1/2)', progress_callback, cancel_token, stage_weight=0.35, stage_offset=0.0)
+            _run_ffmpeg_with_progress(cmd_pass1, dur_s, 'Analiza HEVC (Przebieg 1/2)', progress_callback, cancel_token, stage_weight=0.35, stage_offset=0.0)
 
             if cancel_token and cancel_token.cancelled:
                 raise EncodingError('Anulowano przez uzytkownika.')
@@ -350,7 +390,47 @@ def encode_video(
                 ffmpeg_bin, '-y', '-hide_banner',
                 '-progress', 'pipe:1'
             ] + common_args + vf_args + [
-                '-c:v', codec,
+                '-c:v', 'libx265',
+                '-b:v', f'{v_kbps}k',
+                '-preset', 'slow',
+                '-x265-params', f'pass=2:stats={stats_file_hevc}',
+                '-pix_fmt', 'yuv420p',
+                '-c:a', 'aac',
+                '-b:a', f'{a_kbps}k',
+                '-movflags', '+faststart',
+                output_path
+            ]
+            _run_ffmpeg_with_progress(cmd_pass2, dur_s, 'Finalna kompresja HEVC (Przebieg 2/2)', progress_callback, cancel_token, stage_weight=0.65, stage_offset=35.0)
+
+        else:
+            # CPU H.264 2-pass
+            cpu_preset = 'veryfast' if preset_mode == 'CPU_FAST' else 'slow'
+
+            # Pass 1
+            cmd_pass1 = [
+                ffmpeg_bin, '-y', '-hide_banner',
+                '-progress', 'pipe:1'
+            ] + common_args + vf_args + [
+                '-c:v', 'libx264',
+                '-b:v', f'{v_kbps}k',
+                '-preset', cpu_preset,
+                '-pass', '1',
+                '-passlogfile', stats_file,
+                '-an',
+                '-f', 'null',
+                '-'
+            ]
+            _run_ffmpeg_with_progress(cmd_pass1, dur_s, 'Analiza H.264 (Przebieg 1/2)', progress_callback, cancel_token, stage_weight=0.35, stage_offset=0.0)
+
+            if cancel_token and cancel_token.cancelled:
+                raise EncodingError('Anulowano przez uzytkownika.')
+
+            # Pass 2
+            cmd_pass2 = [
+                ffmpeg_bin, '-y', '-hide_banner',
+                '-progress', 'pipe:1'
+            ] + common_args + vf_args + [
+                '-c:v', 'libx264',
                 '-b:v', f'{v_kbps}k',
                 '-maxrate', f'{int(v_kbps * 1.3)}k',
                 '-bufsize', f'{int(v_kbps * 2.0)}k',
@@ -363,7 +443,7 @@ def encode_video(
                 '-movflags', '+faststart',
                 output_path
             ]
-            _run_ffmpeg_with_progress(cmd_pass2, dur_s, 'Finalna kompresja (Przebieg 2/2)', progress_callback, cancel_token, stage_weight=0.65, stage_offset=35.0)
+            _run_ffmpeg_with_progress(cmd_pass2, dur_s, 'Finalna kompresja H.264 (Przebieg 2/2)', progress_callback, cancel_token, stage_weight=0.65, stage_offset=35.0)
 
         # Weryfikacja rozmiaru pliku (Retry loop w razie przekroczenia)
         if os.path.exists(output_path):

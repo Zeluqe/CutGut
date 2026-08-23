@@ -54,5 +54,9 @@ class TestEncoderCalculations(unittest.TestCase):
         token.cancel()
         self.assertTrue(token.cancelled)
 
+    def test_best_encoder_selection(self):
+        best = encoder.get_best_available_encoder()
+        self.assertIn(best, ['NVENC_HQ', 'AMF_HQ', 'CPU_BALANCED'])
+
 if __name__ == '__main__':
     unittest.main()

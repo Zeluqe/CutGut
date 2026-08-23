@@ -7,7 +7,7 @@
 
 > **High-precision video trimming and smart compression tool tailored for Discord (20 MB free tier, 50 MB / 500 MB Nitro), Messenger, and social uploads.**
 
-CutGut provides frame-accurate video clipping, hardware-accelerated **NVIDIA NVENC** encoding, and 2-pass rate control to ensure your clips fit strictly under upload size caps without visual degradation.
+CutGut provides frame-accurate video clipping, hardware-accelerated **NVIDIA NVENC** & **AMD AMF** GPU encoding, and 2-pass rate control to ensure your clips fit strictly under upload size caps without visual degradation.
 
 ---
 
@@ -18,8 +18,9 @@ CutGut provides frame-accurate video clipping, hardware-accelerated **NVIDIA NVE
   - **Legacy / Small (10 MB)**: Targets ~9.80 MB for quick sharing and strict email/app limits.
   - **Nitro Basic (50 MB)** & **Nitro (500 MB)**: High-bitrate options for longer gaming highlights.
   - **Custom Size (MB)**: Specify any arbitrary target size.
-- ⚡ **NVIDIA NVENC Hardware Acceleration**:
-  - Blazing-fast GPU encoding for NVIDIA GeForce / RTX graphics cards with multi-pass rate control.
+- ⚡ **GPU Hardware Acceleration (NVIDIA NVENC & AMD AMF)**:
+  - Blazing-fast GPU encoding for NVIDIA GeForce / RTX cards (`h264_nvenc`) and AMD Radeon cards (`h264_amf`).
+  - Automatic hardware detection with graceful fallback hierarchy: **NVENC** ➔ **AMF** ➔ **CPU**.
   - CPU fallbacks: Balanced H.264 2-pass (`libx264 slow`), Fast H.264 (`libx264 veryfast`), and Cinematic H.265 (`libx265`).
 - 🎬 **Interactive Video Timeline & Player**:
   - Frame-accurate clipping (`Set Start` / `Set End`).

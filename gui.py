@@ -208,19 +208,29 @@ class CutGutApp(QMainWindow):
         # Enkoder
         self.modeCombo = QComboBox()
         nvenc_avail = encoder.check_nvenc_support()
+        amf_avail = encoder.check_amf_support()
+
         if nvenc_avail:
             self.modeCombo.addItems([
-                'NVIDIA NVENC (GPU HQ)',
-                'NVIDIA NVENC (GPU Fast)',
-                'CPU H.264 (Zbalansowany)',
-                'CPU H.264 (Szybki)',
-                'CPU H.265 (Kinowy)'
+                '⚡ NVIDIA NVENC (GPU HQ)',
+                '🚀 NVIDIA NVENC (GPU Fast)',
+                '⚖️ CPU H.264 (Zbalansowany)',
+                '💨 CPU H.264 (Szybki)',
+                '💎 CPU H.265 (Kinowy)'
+            ])
+        elif amf_avail:
+            self.modeCombo.addItems([
+                '🔴 AMD AMF (GPU HQ)',
+                '🚀 AMD AMF (GPU Fast)',
+                '⚖️ CPU H.264 (Zbalansowany)',
+                '💨 CPU H.264 (Szybki)',
+                '💎 CPU H.265 (Kinowy)'
             ])
         else:
             self.modeCombo.addItems([
-                'CPU H.264 (Zbalansowany)',
-                'CPU H.264 (Szybki)',
-                'CPU H.265 (Kinowy)'
+                '⚖️ CPU H.264 (Zbalansowany)',
+                '💨 CPU H.264 (Szybki)',
+                '💎 CPU H.265 (Kinowy)'
             ])
         self.modeCombo.setFixedWidth(220)
         bottom_row.addWidget(self.modeCombo)
@@ -391,6 +401,10 @@ class CutGutApp(QMainWindow):
             return 'NVENC_HQ'
         elif 'NVENC (GPU Fast)' in txt:
             return 'NVENC_FAST'
+        elif 'AMD AMF (GPU HQ)' in txt:
+            return 'AMF_HQ'
+        elif 'AMD AMF (GPU Fast)' in txt:
+            return 'AMF_FAST'
         elif 'CPU H.264 (Szybki)' in txt:
             return 'CPU_FAST'
         elif 'CPU H.265' in txt:
