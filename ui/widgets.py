@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QWidget, QFrame, QLabel, QHBoxLayout, QVBoxLayout,
     QPushButton, QGraphicsOpacityEffect, QDialog
 )
-from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRectF
+from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRectF, QPointF, QPoint
 from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QFont
 
 class FluentCard(QFrame):

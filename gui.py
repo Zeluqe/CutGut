@@ -24,7 +24,7 @@ from ui.widgets import FluentCard, ToastNotification, QualityBadge, HelpShortcut
 from ui.settings_dialog import FluentSettingsDialog
 from ui.queue_drawer import QueueDrawerWidget
 
-__version__ = "202608240-6-3"
+__version__ = "202608240-6-4"
 
 TRANSLATIONS = {
     'pl': {
