@@ -1,12 +1,12 @@
 # ✂️ CutGut
 
-[![Version](https://img.shields.io/badge/version-202608240--6--1-blue.svg)](https://github.com/Zeluqe/CutGut/releases/tag/202608240-6-1)
+[![Version](https://img.shields.io/badge/version-202608240--6--3-blue.svg)](https://github.com/Zeluqe/CutGut/releases/tag/202608240-6-3)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://www.python.org/)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-Supported-red.svg)](https://ffmpeg.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)]()
 
-[![Download CutGut.exe](https://img.shields.io/badge/Download-CutGut.exe%20(Build%20202608240--6--1)-2563eb?logo=windows&style=for-the-badge)](https://github.com/Zeluqe/CutGut/releases/download/202608240-6-1/CutGut.exe)
+[![Download CutGut.exe](https://img.shields.io/badge/Download-CutGut.exe%20(Build%20202608240--6--3)-2563eb?logo=windows&style=for-the-badge)](https://github.com/Zeluqe/CutGut/releases/download/202608240-6-3/CutGut.exe)
 
 > **Modern Windows 11 Fluent UI video trimming, interactive social framing/cropping, and smart compression tool tailored for Discord (20 MB free tier, 50 MB / 500 MB Nitro), YouTube Shorts, TikTok, Reels, and social uploads.**
 

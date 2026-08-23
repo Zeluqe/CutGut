@@ -24,7 +24,7 @@ from ui.widgets import FluentCard, ToastNotification, QualityBadge, HelpShortcut
 from ui.settings_dialog import FluentSettingsDialog
 from ui.queue_drawer import QueueDrawerWidget
 
-__version__ = "202608240-6-1"
+__version__ = "202608240-6-3"
 
 TRANSLATIONS = {
     'pl': {
@@ -1343,8 +1343,20 @@ class CutGutApp(QMainWindow):
         if hasattr(self, 'toast') and self.toast.isVisible():
             self.toast.move(self.width() - self.toast.width() - 30, 25)
 
+def global_exception_handler(exctype, value, tb):
+    import traceback
+    err_str = "".join(traceback.format_exception(exctype, value, tb))
+    print(err_str, file=sys.stderr)
+    try:
+        QMessageBox.critical(None, "CutGut Error", f"An unexpected error occurred:\n\n{err_str}")
+    except Exception:
+        pass
+    sys.__excepthook__(exctype, value, tb)
+
 if __name__ == '__main__':
+    sys.excepthook = global_exception_handler
     app = QApplication(sys.argv)
     window = CutGutApp()
     window.show()
     sys.exit(app.exec())
+

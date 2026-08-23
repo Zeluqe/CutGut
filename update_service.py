@@ -114,43 +114,70 @@ def compute_sha256(file_path: str) -> str:
 
 def apply_update_and_restart(new_exe_path: str):
     """
-    Tworzy skrypt pomocniczy, który po zamknięciu aplikacji podmienia CutGut.exe na nową wersję i uruchamia program.
+    Tworzy skrypt pomocniczy, który po zamknięciu aplikacji bezpiecznie podmienia CutGut.exe
+    na nową wersję i uruchamia program jako czysty proces pulpitu (explorer.exe).
     """
     current_exe = sys.executable if getattr(sys, 'frozen', False) else os.path.join(encoder.get_base_dir(), 'CutGut.exe')
     current_pid = os.getpid()
     
     base_dir = os.path.dirname(os.path.abspath(current_exe))
-    bat_path = os.path.join(base_dir, 'cutgut_updater.bat')
     bak_path = os.path.join(base_dir, 'CutGut.exe.bak')
 
-    bat_content = f"""@echo off
-chcp 65001 >nul
-echo Oczekiwanie na zamkniecie CutGut (PID: {current_pid})...
-:wait_loop
-tasklist /FI "PID eq {current_pid}" 2>NUL | find /I "{current_pid}" >NUL
-if "%ERRORLEVEL%"=="0" (
-    timeout /t 1 /nobreak >nul
-    goto wait_loop
-)
+    ps_command = f"""
+    $pidToWait = {current_pid}
+    $curExe = '{current_exe}'
+    $bakExe = '{bak_path}'
+    $newExe = '{new_exe_path}'
 
-timeout /t 1 /nobreak >nul
+    try {{
+        Wait-Process -Id $pidToWait -Timeout 15 -ErrorAction SilentlyContinue
+    }} catch {{}}
+    Start-Sleep -Seconds 1
 
+    if (Test-Path $bakExe) {{ Remove-Item -Force $bakExe -ErrorAction SilentlyContinue }}
+    if (Test-Path $curExe) {{ Move-Item -Force $curExe $bakExe -ErrorAction SilentlyContinue }}
+    if (Test-Path $newExe) {{ Move-Item -Force $newExe $curExe -ErrorAction SilentlyContinue }}
+
+    Start-Sleep -Milliseconds 500
+    Start-Process -FilePath $curExe
+    """
+
+    DETACHED_PROCESS = 0x00000008
+    CREATE_NEW_PROCESS_GROUP = 0x00000200
+
+    try:
+        subprocess.Popen(
+            [
+                'powershell.exe',
+                '-NoProfile',
+                '-NonInteractive',
+                '-WindowStyle', 'Hidden',
+                '-Command', ps_command
+            ],
+            creationflags=DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | encoder.CREATE_NO_WINDOW,
+            close_fds=True
+        )
+    except Exception:
+        # Fallback do .bat z odpaleniem przez explorer.exe
+        bat_path = os.path.join(base_dir, 'cutgut_updater.bat')
+        bat_content = f"""@echo off
+timeout /t 2 /nobreak >nul
 if exist "{bak_path}" del /f /q "{bak_path}"
 if exist "{current_exe}" move /y "{current_exe}" "{bak_path}"
 move /y "{new_exe_path}" "{current_exe}"
-
-start "" "{current_exe}"
+explorer.exe "{current_exe}"
 del "%~f0" & exit
 """
+        with open(bat_path, 'w', encoding='utf-8') as f:
+            f.write(bat_content)
+        subprocess.Popen(
+            ['cmd.exe', '/c', bat_path],
+            creationflags=DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | encoder.CREATE_NO_WINDOW,
+            close_fds=True
+        )
 
-    with open(bat_path, 'w', encoding='utf-8') as f:
-        f.write(bat_content)
-
-    subprocess.Popen(
-        ['cmd.exe', '/c', bat_path],
-        creationflags=encoder.CREATE_NO_WINDOW
-    )
     sys.exit(0)
+
 
 class CheckUpdateWorker(QThread):
     finished_signal = pyqtSignal(object) # Optional[ReleaseInfo]
