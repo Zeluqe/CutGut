@@ -12,6 +12,8 @@ if hasattr(sys.stderr, 'reconfigure'):
 
 import encoder
 
+__version__ = "202608230-0-0"
+
 def parse_target_mb(val: str) -> float:
     v = val.lower().replace('mb', '').replace('m', '').strip()
     try:
@@ -21,9 +23,10 @@ def parse_target_mb(val: str) -> float:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='CutGut CLI - Smart video trimming and 2-pass compression tool (Discord 20MB/10MB/50MB).'
+        description=f'CutGut CLI v{__version__} - Smart video trimming and 2-pass compression tool (Discord 20MB/10MB/50MB).'
     )
-    parser.add_argument('input', help='Sciezka do pliku wideo')
+    parser.add_argument('-v', '--version', action='version', version=f'%(prog)s {__version__}')
+    parser.add_argument('input', nargs='?', help='Sciezka do pliku wideo')
     parser.add_argument('-s', '--start', type=float, default=0.0, help='Czas poczatku w sekundach (domyslnie 0.0)')
     parser.add_argument('-e', '--end', type=float, default=None, help='Czas konca w sekundach (domyslnie calosc)')
     parser.add_argument('-t', '--target', default='20mb', help='Docelowy limit rozmiaru: 20mb (domyslnie), 10mb, 50mb, 500mb lub liczba MB')

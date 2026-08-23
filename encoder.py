@@ -11,6 +11,7 @@ import functools
 from dataclasses import dataclass
 from typing import Optional, Callable
 
+__version__ = "202608230-0-0"
 
 CREATE_NO_WINDOW = 0x08000000 if os.name == 'nt' else 0
 

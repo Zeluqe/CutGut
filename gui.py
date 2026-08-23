@@ -48,11 +48,13 @@ class EncodingWorker(QThread):
     def cancel(self):
         self.cancel_token.cancel()
 
+__version__ = "202608230-0-0"
+
 class CutGutApp(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle('CutGut - Video Trimming & Smart Compression')
+        self.setWindowTitle(f'CutGut v{__version__} - Video Trimming & Smart Compression')
         self.setMinimumSize(960, 780)
         self.setAcceptDrops(True)
 
