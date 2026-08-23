@@ -13,9 +13,23 @@ from enum import Enum
 from dataclasses import dataclass
 from typing import Optional, Callable
 
-__version__ = "202608230-3-0"
+__version__ = "202608230-4-0"
 
 CREATE_NO_WINDOW = 0x08000000 if os.name == 'nt' else 0
+
+def parse_version(v: str) -> tuple[int, int, int]:
+    clean = re.sub(r'^[^\d]*', '', v.strip())
+    parts = clean.split('-')
+    try:
+        data_part = int(parts[0]) if len(parts) > 0 else 0
+        extra_part = int(parts[1]) if len(parts) > 1 else 0
+        fixy_part = int(parts[2]) if len(parts) > 2 else 0
+        return (data_part, extra_part, fixy_part)
+    except Exception:
+        return (0, 0, 0)
+
+def is_version_newer(current: str, candidate: str) -> bool:
+    return parse_version(candidate) > parse_version(current)
 
 def get_base_dir() -> str:
     if getattr(sys, 'frozen', False):
@@ -108,6 +122,21 @@ class EncodeJob:
     progress_pct: float = 0.0
     result_size: int = 0
     error_message: str = ""
+    cleanup_policy: str = "never"
+
+@dataclass
+class ExportResult:
+    input_path: str
+    output_path: str
+    start_s: float
+    end_s: float
+    duration_s: float
+    target_mb: float
+    actual_size_bytes: int
+    is_remux: bool = False
+    is_sample: bool = False
+    plan: Optional[dict] = None
+    preset_mode: str = ""
     cleanup_policy: str = "never"
 
 @dataclass

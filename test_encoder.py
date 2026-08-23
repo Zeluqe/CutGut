@@ -122,5 +122,39 @@ class TestEncoderCalculations(unittest.TestCase):
         self.assertIn('CutGut_TestClip_', fp)
         self.assertTrue(fp.endswith('.mp4'))
 
+    def test_version_parsing_and_newer_check(self):
+        # 1. Sprawdzanie parsowania formatu DATA-EXTRA-FIXY
+        self.assertEqual(encoder.parse_version("202608230-4-0"), (202608230, 4, 0))
+        self.assertEqual(encoder.parse_version("v202608230-4-1"), (202608230, 4, 1))
+        self.assertEqual(encoder.parse_version("202608231-4-0"), (202608231, 4, 0))
+
+        # 2. Porównywanie wersji (nowa fala EXTRA)
+        self.assertTrue(encoder.is_version_newer("202608230-3-0", "202608230-4-0"))
+        # 3. Porównywanie wersji (poprawka FIXY)
+        self.assertTrue(encoder.is_version_newer("202608230-4-0", "202608230-4-1"))
+        # 4. Nowy dzień/data (DATA)
+        self.assertTrue(encoder.is_version_newer("202608230-4-1", "202608231-4-0"))
+        # 5. Starsza lub równa wersja
+        self.assertFalse(encoder.is_version_newer("202608230-4-0", "202608230-4-0"))
+        self.assertFalse(encoder.is_version_newer("202608231-4-0", "202608230-5-0"))
+
+    def test_export_result_model(self):
+        res = encoder.ExportResult(
+            input_path="input.mp4",
+            output_path="outputs/CutGut_output.mp4",
+            start_s=5.0,
+            end_s=15.0,
+            duration_s=10.0,
+            target_mb=20.0,
+            actual_size_bytes=19580000,
+            is_remux=False,
+            is_sample=False,
+            preset_mode="NVENC_HQ",
+            cleanup_policy="trash"
+        )
+        self.assertEqual(res.duration_s, 10.0)
+        self.assertEqual(res.target_mb, 20.0)
+        self.assertEqual(res.cleanup_policy, "trash")
+
 if __name__ == '__main__':
     unittest.main()

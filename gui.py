@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout, QPushButton, QLabel, QSlider,
     QFileDialog, QProgressBar, QStyle, QComboBox, QMessageBox,
     QCheckBox, QInputDialog, QDialog, QRadioButton, QButtonGroup,
-    QTableWidget, QTableWidgetItem, QHeaderView, QFrame
+    QTableWidget, QTableWidgetItem, QHeaderView, QFrame, QTextEdit
 )
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
@@ -16,6 +16,8 @@ from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QThread, QSettings, QEvent
 from PyQt6.QtGui import QFont, QColor
 
 import encoder
+import update_service
+from comparison_dialog import QualityComparisonDialog, ClickableVideoWidget
 
 class EncodingWorker(QThread):
     progress_signal = pyqtSignal(object)
@@ -81,7 +83,7 @@ class SamplePreviewWorker(QThread):
     def cancel(self):
         self.cancel_token.cancel()
 
-__version__ = "202608230-3-0"
+__version__ = "202608230-4-0"
 
 TRANSLATIONS = {
     'pl': {
@@ -108,13 +110,7 @@ TRANSLATIONS = {
         'btn_test_sample': '🔬 Sprawdź jakość w tym momencie',
         'sample_remux_msg': '⚡ Brak kompresji (Remux) — film zachowa 100% oryginalnej jakości.',
         'sample_generating': '⏳ Generowanie próbki jakości (6s wokół kursora)...',
-        'sample_done': '✅ Próbka gotowa! Porównaj jakość oryginału i kompresji powyżej.',
-        'preview_source_btn': '📹 Oryginał',
-        'preview_result_btn': '✨ Wynik ✓',
-        'preview_sample_btn': '🔬 Próbka jakości',
-        'preview_label': 'PODGLĄD:',
-        'btn_open_file': '🎬 Otwórz plik',
-        'btn_open_folder': '📁 Otwórz folder',
+        'sample_done': '✅ Próbka gotowa! Otwarto okno porównania jakości A/B.',
         'presets': [
             '🎯 Discord Free (20 MB)',
             '📦 Legacy / Small (10 MB)',
@@ -170,13 +166,20 @@ TRANSLATIONS = {
         'opt_delete': '○ Usuń oryginał na stałe automatycznie (⚠ Nieodwracalne)',
         'settings_extra_header': 'DODATKOWE',
         'chk_auto_open': 'Otwórz folder wynikowy po eksporcie',
-        'chk_auto_preview': 'Automatycznie pokaż gotowy film w podglądzie',
+        'chk_auto_ab': 'Automatycznie otwórz okno porównania A/B',
+        'settings_updates_header': 'AKTUALIZACJE',
+        'lbl_current_ver': 'Wersja: {version}',
+        'btn_check_updates': '🔄 Sprawdź aktualizacje',
+        'chk_auto_check_updates': 'Sprawdzaj aktualizacje przy uruchamianiu',
+        'chk_include_prerelease': 'Pokazuj wersje testowe (prerelease)',
         'btn_save_settings': 'Zapisz ustawienia',
         'btn_cancel_settings': 'Anuluj',
         'ask_cleanup_title': 'Usunięcie oryginału',
-        'ask_cleanup_msg': 'Eksport zakończony sukcesem!\\nCzy chcesz przenieść oryginalny plik do Kosza?\\n\\n{path}',
+        'ask_cleanup_msg': 'Eksport zakończony sukcesem!\nCzy chcesz przenieść oryginalny plik do Kosza?\n\n{path}',
         'perm_delete_warn_title': 'Ostrzeżenie o trwałym usuwaniu',
-        'perm_delete_warn_msg': 'Uwaga: Ta opcja będzie bezpowrotnie usuwać oryginalne pliki wideo z dysku po każdym eksporcie.\\n\\nCzy na pewno chcesz ją włączyć?'
+        'perm_delete_warn_msg': 'Uwaga: Ta opcja będzie bezpowrotnie usuwać oryginalne pliki wideo z dysku po każdym eksporcie.\n\nCzy na pewno chcesz ją włączyć?',
+        'no_update_title': 'Aktualizacje CutGut',
+        'no_update_msg': 'Posiadasz najnowszą wersję programu ({version})!'
     },
     'en': {
         'title': 'CutGut v{version} - Video Trimming & Smart Compression',
@@ -202,13 +205,7 @@ TRANSLATIONS = {
         'btn_test_sample': '🔬 Test Quality Sample at this point',
         'sample_remux_msg': '⚡ Direct Stream Copy (Remux) — 100% original quality preserved.',
         'sample_generating': '⏳ Generating quality sample (6s around playhead)...',
-        'sample_done': '✅ Sample ready! Compare original and compressed quality above.',
-        'preview_source_btn': '📹 Original',
-        'preview_result_btn': '✨ Result ✓',
-        'preview_sample_btn': '🔬 Quality Sample',
-        'preview_label': 'PREVIEW:',
-        'btn_open_file': '🎬 Open File',
-        'btn_open_folder': '📁 Open Folder',
+        'sample_done': '✅ Sample ready! Opened A/B quality comparison window.',
         'presets': [
             '🎯 Discord Free (20 MB)',
             '📦 Legacy / Small (10 MB)',
@@ -264,25 +261,148 @@ TRANSLATIONS = {
         'opt_delete': '○ Delete original permanently automatically (⚠ Irreversible)',
         'settings_extra_header': 'ADDITIONAL OPTIONS',
         'chk_auto_open': 'Open output folder after export',
-        'chk_auto_preview': 'Automatically show finished video in player',
+        'chk_auto_ab': 'Automatically open A/B comparison window',
+        'settings_updates_header': 'UPDATES',
+        'lbl_current_ver': 'Version: {version}',
+        'btn_check_updates': '🔄 Check for updates',
+        'chk_auto_check_updates': 'Check for updates on startup',
+        'chk_include_prerelease': 'Show test/prerelease builds',
         'btn_save_settings': 'Save settings',
         'btn_cancel_settings': 'Cancel',
         'ask_cleanup_title': 'Original File Cleanup',
-        'ask_cleanup_msg': 'Export completed successfully!\\nDo you want to move the original source video to Recycle Bin?\\n\\n{path}',
+        'ask_cleanup_msg': 'Export completed successfully!\nDo you want to move the original source video to Recycle Bin?\n\n{path}',
         'perm_delete_warn_title': 'Permanent Deletion Warning',
-        'perm_delete_warn_msg': 'Warning: This option will permanently delete original videos after each export.\\n\\nAre you sure you want to enable this?'
+        'perm_delete_warn_msg': 'Warning: This option will permanently delete original videos after each export.\n\nAre you sure you want to enable this?',
+        'no_update_title': 'CutGut Updates',
+        'no_update_msg': 'You have the latest version ({version})!'
     }
 }
 
+class UpdateAvailableDialog(QDialog):
+    def __init__(self, parent, release: update_service.ReleaseInfo, current_version: str, lang: str = 'pl'):
+        super().__init__(parent)
+        self.release = release
+        self.current_version = current_version
+        self.lang = lang
+        self.download_worker = None
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle("Dostępna aktualizacja" if self.lang == 'pl' else "Update Available")
+        self.setFixedWidth(480)
+        self.setStyleSheet('''
+            QDialog { background-color: #0f172a; }
+            QLabel { color: #f8fafc; font-size: 13px; font-family: 'Segoe UI', system-ui; }
+            QTextEdit { background-color: #131d2e; color: #cbd5e1; border: 1px solid #334155; border-radius: 6px; font-size: 12px; }
+            QPushButton { 
+                border-radius: 6px; padding: 7px 14px; color: white; 
+                font-weight: bold; background-color: #1e293b; border: 1px solid #334155; 
+            }
+            QPushButton:hover { background-color: #3b82f6; border: 1px solid #60a5fa; }
+            QProgressBar { 
+                border: 1px solid #334155; border-radius: 6px; text-align: center; 
+                color: white; font-weight: bold; background-color: #1e293b; height: 16px;
+            }
+            QProgressBar::chunk { background-color: #22c55e; border-radius: 5px; }
+        ''')
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(10)
+
+        hdr = QLabel(f"🚀 <b>{'Nowa wersja CutGut jest dostępna!' if self.lang == 'pl' else 'A new CutGut version is available!'}</b>")
+        hdr.setStyleSheet('color: #60a5fa; font-size: 14px;')
+        layout.addWidget(hdr)
+
+        info_lbl = QLabel(f"<b>{'Twoja wersja:' if self.lang == 'pl' else 'Your version:'}</b> {self.current_version} &nbsp;&nbsp;➔&nbsp;&nbsp; <b>{'Nowa wersja:' if self.lang == 'pl' else 'New version:'}</b> <span style='color: #34d399;'>{self.release.tag_name}</span>")
+        layout.addWidget(info_lbl)
+
+        lbl_notes = QLabel(f"<b>{'Co nowego:' if self.lang == 'pl' else 'Changelog:'}</b>")
+        layout.addWidget(lbl_notes)
+
+        self.txtNotes = QTextEdit()
+        self.txtNotes.setReadOnly(True)
+        self.txtNotes.setPlainText(self.release.body if self.release.body else "Brak opisu zmian.")
+        self.txtNotes.setFixedHeight(130)
+        layout.addWidget(self.txtNotes)
+
+        self.progBar = QProgressBar()
+        self.progBar.setVisible(False)
+        layout.addWidget(self.progBar)
+
+        self.lblStatus = QLabel('')
+        self.lblStatus.setStyleSheet('color: #94a3b8; font-size: 11px;')
+        self.lblStatus.setVisible(False)
+        layout.addWidget(self.lblStatus)
+
+        btn_box = QHBoxLayout()
+        btn_box.addStretch()
+
+        self.btnLater = QPushButton("Później" if self.lang == 'pl' else "Later")
+        self.btnLater.clicked.connect(self.reject)
+        btn_box.addWidget(self.btnLater)
+
+        self.btnUpdate = QPushButton("Pobierz i zaktualizuj" if self.lang == 'pl' else "Download & Update")
+        self.btnUpdate.setStyleSheet('background-color: #2563eb; padding: 8px 18px;')
+        self.btnUpdate.clicked.connect(self.start_download)
+        btn_box.addWidget(self.btnUpdate)
+
+        layout.addLayout(btn_box)
+
+    def start_download(self):
+        if not getattr(sys, 'frozen', False):
+            QMessageBox.information(
+                self, "CutGut",
+                "Auto-update z poziomu programu jest przeznaczony dla pliku CutGut.exe. W wersji deweloperskiej zaktualizuj kod przez Git."
+            )
+            return
+
+        self.btnUpdate.setEnabled(False)
+        self.btnLater.setEnabled(False)
+        self.progBar.setVisible(True)
+        self.lblStatus.setVisible(True)
+        self.lblStatus.setText("Pobieranie nowego pliku wykonywalnego..." if self.lang == 'pl' else "Downloading executable...")
+
+        temp_dir = encoder.get_temp_dir()
+        target_path = os.path.join(temp_dir, "CutGut.exe.new")
+
+        self.download_worker = update_service.DownloadUpdateWorker(self.release.asset_url, target_path)
+        self.download_worker.progress_signal.connect(self.on_download_progress)
+        self.download_worker.finished_signal.connect(self.on_download_finished)
+        self.download_worker.error_signal.connect(self.on_download_error)
+        self.download_worker.start()
+
+    def on_download_progress(self, downloaded: int, total: int):
+        if total > 0:
+            pct = int((downloaded / total) * 100)
+            self.progBar.setValue(pct)
+            self.lblStatus.setText(f"{downloaded / 1000000:.1f} MB / {total / 1000000:.1f} MB ({pct}%)")
+
+    def on_download_finished(self, downloaded_path: str):
+        self.lblStatus.setText("Instalowanie aktualizacji i ponowne uruchamianie..." if self.lang == 'pl' else "Installing update & restarting...")
+        QApplication.processEvents()
+        time.sleep(0.5)
+        update_service.apply_update_and_restart(downloaded_path)
+
+    def on_download_error(self, err_msg: str):
+        self.btnUpdate.setEnabled(True)
+        self.btnLater.setEnabled(True)
+        self.progBar.setVisible(False)
+        self.lblStatus.setText(f"❌ {err_msg}")
+        QMessageBox.critical(self, "Błąd aktualizacji", err_msg)
+
 class SettingsDialog(QDialog):
-    def __init__(self, parent, current_policy: str, current_lang: str, output_dir: str, auto_open: bool, auto_preview: bool):
+    def __init__(self, parent, current_policy: str, current_lang: str, output_dir: str, auto_open: bool, auto_ab: bool, auto_check_updates: bool, include_prerelease: bool):
         super().__init__(parent)
         self.parent_app = parent
         self.current_lang = current_lang
         self.selected_policy = current_policy
         self.output_dir = output_dir
         self.auto_open = auto_open
-        self.auto_preview = auto_preview
+        self.auto_ab = auto_ab
+        self.auto_check_updates = auto_check_updates
+        self.include_prerelease = include_prerelease
+        self.check_worker = None
         self.init_ui()
 
     def t(self, key: str) -> str:
@@ -291,7 +411,7 @@ class SettingsDialog(QDialog):
 
     def init_ui(self):
         self.setWindowTitle(self.t('settings_title'))
-        self.setFixedWidth(500)
+        self.setFixedWidth(520)
         self.setStyleSheet('''
             QDialog { background-color: #0f172a; }
             QLabel { color: #f8fafc; font-size: 13px; font-family: 'Segoe UI', system-ui; }
@@ -306,8 +426,8 @@ class SettingsDialog(QDialog):
         ''')
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(22, 20, 22, 20)
-        layout.setSpacing(14)
+        layout.setContentsMargins(22, 18, 22, 18)
+        layout.setSpacing(12)
 
         # 1. FOLDER WYNIKOWY
         lbl_out_hdr = QLabel(f"📁 <b>{self.t('settings_out_dir_header')}</b>")
@@ -387,11 +507,40 @@ class SettingsDialog(QDialog):
         self.chkAutoOpen.setChecked(self.auto_open)
         layout.addWidget(self.chkAutoOpen)
 
-        self.chkAutoPreview = QCheckBox(self.t('chk_auto_preview'))
-        self.chkAutoPreview.setChecked(self.auto_preview)
-        layout.addWidget(self.chkAutoPreview)
+        self.chkAutoAB = QCheckBox(self.t('chk_auto_ab'))
+        self.chkAutoAB.setChecked(self.auto_ab)
+        layout.addWidget(self.chkAutoAB)
 
-        layout.addSpacing(10)
+        # Linia podziału
+        line3 = QFrame()
+        line3.setFrameShape(QFrame.Shape.HLine)
+        line3.setStyleSheet('color: #1e293b;')
+        layout.addWidget(line3)
+
+        # 4. AKTUALIZACJE
+        lbl_upd_hdr = QLabel(f"🚀 <b>{self.t('settings_updates_header')}</b>")
+        lbl_upd_hdr.setStyleSheet('color: #60a5fa; font-size: 13px;')
+        layout.addWidget(lbl_upd_hdr)
+
+        upd_row = QHBoxLayout()
+        lbl_v = QLabel(self.t('lbl_current_ver').format(version=__version__))
+        lbl_v.setStyleSheet('color: #94a3b8;')
+        upd_row.addWidget(lbl_v, 1)
+
+        self.btnCheckUpdates = QPushButton(self.t('btn_check_updates'))
+        self.btnCheckUpdates.clicked.connect(self.check_updates_clicked)
+        upd_row.addWidget(self.btnCheckUpdates)
+        layout.addLayout(upd_row)
+
+        self.chkAutoCheckUpdates = QCheckBox(self.t('chk_auto_check_updates'))
+        self.chkAutoCheckUpdates.setChecked(self.auto_check_updates)
+        layout.addWidget(self.chkAutoCheckUpdates)
+
+        self.chkIncludePrerelease = QCheckBox(self.t('chk_include_prerelease'))
+        self.chkIncludePrerelease.setChecked(self.include_prerelease)
+        layout.addWidget(self.chkIncludePrerelease)
+
+        layout.addSpacing(8)
         btn_box = QHBoxLayout()
         btn_box.addStretch()
 
@@ -421,6 +570,23 @@ class SettingsDialog(QDialog):
         self.output_dir = ''
         self.lblDirPath.setText(encoder.get_default_output_dir())
 
+    def check_updates_clicked(self):
+        self.btnCheckUpdates.setEnabled(False)
+        self.check_worker = update_service.CheckUpdateWorker(__version__, self.chkIncludePrerelease.isChecked())
+        self.check_worker.finished_signal.connect(self.on_update_check_result)
+        self.check_worker.start()
+
+    def on_update_check_result(self, rel: Optional[update_service.ReleaseInfo]):
+        self.btnCheckUpdates.setEnabled(True)
+        if rel:
+            dlg = UpdateAvailableDialog(self, rel, __version__, self.current_lang)
+            dlg.exec()
+        else:
+            QMessageBox.information(
+                self, self.t('no_update_title'),
+                self.t('no_update_msg').format(version=__version__)
+            )
+
     def on_save(self):
         checked_id = self.btn_group.checkedId()
         if checked_id == 1:
@@ -441,16 +607,10 @@ class SettingsDialog(QDialog):
 
         self.selected_policy = pol
         self.auto_open = self.chkAutoOpen.isChecked()
-        self.auto_preview = self.chkAutoPreview.isChecked()
+        self.auto_ab = self.chkAutoAB.isChecked()
+        self.auto_check_updates = self.chkAutoCheckUpdates.isChecked()
+        self.include_prerelease = self.chkIncludePrerelease.isChecked()
         self.accept()
-
-class ClickableVideoWidget(QVideoWidget):
-    clicked_signal = pyqtSignal()
-
-    def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.clicked_signal.emit()
-        super().mouseReleaseEvent(event)
 
 class CutGutApp(QMainWindow):
     def __init__(self):
@@ -464,22 +624,22 @@ class CutGutApp(QMainWindow):
         self.cleanup_policy = self.settings.value('cleanup_policy', encoder.SourceCleanupPolicy.NEVER.value)
         self.custom_output_dir = self.settings.value('output_directory', '')
         self.auto_open_folder = (self.settings.value('auto_open_folder', 'true') == 'true')
-        self.auto_preview_result = (self.settings.value('auto_preview_result', 'true') == 'true')
+        self.auto_ab_compare = (self.settings.value('auto_ab_compare', 'true') == 'true')
+        self.auto_check_updates = (self.settings.value('auto_check_updates', 'true') == 'true')
+        self.include_prerelease = (self.settings.value('include_prerelease', 'false') == 'true')
 
-        self.setMinimumSize(1000, 890)
+        self.setMinimumSize(1000, 880)
         self.setAcceptDrops(True)
 
         self.setStyleSheet('''
             QMainWindow { background-color: #0b0f19; }
             QLabel { color: #f8fafc; font-family: 'Segoe UI', system-ui; font-size: 13px; }
-            
             QPushButton { 
                 border-radius: 6px; padding: 8px 14px; color: white; 
                 font-weight: bold; background-color: #1e293b; border: 1px solid #334155; 
             }
             QPushButton:hover { background-color: #3b82f6; border: 1px solid #60a5fa; }
             QPushButton:disabled { background-color: #131d2e; color: #475569; border: 1px solid #1e293b; }
-            
             QSlider::groove:horizontal {
                 border: 1px solid #334155; height: 10px; background: #1e293b;
                 margin: 2px 0; border-radius: 5px;
@@ -488,7 +648,6 @@ class CutGutApp(QMainWindow):
                 background: #3b82f6; border: 2px solid #60a5fa;
                 width: 18px; height: 18px; margin: -5px 0; border-radius: 9px;
             }
-            
             QComboBox { 
                 background-color: #1e293b; color: white; border-radius: 6px; 
                 padding: 7px 10px; border: 1px solid #334155; font-weight: bold;
@@ -498,17 +657,14 @@ class CutGutApp(QMainWindow):
                 background-color: #1e293b; color: white; selection-background-color: #3b82f6;
                 border: 1px solid #334155;
             }
-            
             QProgressBar { 
                 border: 1px solid #334155; border-radius: 6px; text-align: center; 
                 color: white; font-weight: bold; background-color: #1e293b;
             }
             QProgressBar::chunk { background-color: #3b82f6; border-radius: 5px; }
-            
             QCheckBox { color: #cbd5e1; font-weight: bold; }
             QCheckBox::indicator { width: 16px; height: 16px; border-radius: 4px; border: 1px solid #475569; background: #1e293b; }
             QCheckBox::indicator:checked { background: #3b82f6; border: 1px solid #60a5fa; }
-
             QTableWidget {
                 background-color: #131d2e; border: 1px solid #334155; border-radius: 6px;
                 color: #e2e8f0; gridline-color: #1e293b;
@@ -520,10 +676,6 @@ class CutGutApp(QMainWindow):
         ''')
 
         self.input_file = ''
-        self.preview_result_path = ''
-        self.preview_sample_path = ''
-        self.active_media_mode = 'source' # 'source' | 'result' | 'sample'
-        
         self.video_info = None
         self.video_fps = 60.0
         self.start_ms = 0
@@ -531,6 +683,8 @@ class CutGutApp(QMainWindow):
         self.custom_mb = 20.0
         self.worker = None
         self.sample_worker = None
+        self.bg_update_worker = None
+        self.comparison_dialog = None
         self.queue: list[encoder.EncodeJob] = []
         self.active_job: Optional[encoder.EncodeJob] = None
 
@@ -546,6 +700,7 @@ class CutGutApp(QMainWindow):
         self.init_ui()
         self.retranslate_ui()
         self.check_ffmpeg_startup()
+        self.startup_maintenance()
 
     def t(self, key: str) -> any:
         lang_dict = TRANSLATIONS.get(self.current_lang, TRANSLATIONS['pl'])
@@ -562,7 +717,7 @@ class CutGutApp(QMainWindow):
         self.videoWidget.setToolTip(self.t('video_tooltip'))
         main_layout.addWidget(self.videoWidget)
 
-        # 2. Pasek czasu i kontrolki odtwarzacza + A/B przełącznik
+        # 2. Pasek czasu i kontrolki odtwarzacza
         player_panel = QWidget()
         player_layout = QVBoxLayout(player_panel)
         player_layout.setContentsMargins(0, 0, 0, 0)
@@ -587,29 +742,6 @@ class CutGutApp(QMainWindow):
         self.chkLoop = QCheckBox()
         self.chkLoop.setStyleSheet('margin-left: 8px;')
         controls_row.addWidget(self.chkLoop)
-
-        # A/B Podgląd przełącznik (Oryginał / Wynik / Próbka)
-        self.abContainer = QWidget()
-        ab_layout = QHBoxLayout(self.abContainer)
-        ab_layout.setContentsMargins(10, 0, 10, 0)
-        ab_layout.setSpacing(6)
-
-        self.lblPreviewHeader = QLabel(self.t('preview_label'))
-        self.lblPreviewHeader.setStyleSheet('font-weight: bold; color: #94a3b8; font-size: 12px;')
-        ab_layout.addWidget(self.lblPreviewHeader)
-
-        self.btnViewSource = QPushButton(self.t('preview_source_btn'))
-        self.btnViewSource.setStyleSheet('background-color: #2563eb; font-size: 12px; padding: 5px 10px;')
-        self.btnViewSource.clicked.connect(lambda: self.switch_preview_media('source'))
-        ab_layout.addWidget(self.btnViewSource)
-
-        self.btnViewResult = QPushButton(self.t('preview_result_btn'))
-        self.btnViewResult.setStyleSheet('background-color: #1e293b; color: #94a3b8; font-size: 12px; padding: 5px 10px;')
-        self.btnViewResult.clicked.connect(lambda: self.switch_preview_media('result'))
-        ab_layout.addWidget(self.btnViewResult)
-
-        self.abContainer.setVisible(False)
-        controls_row.addWidget(self.abContainer)
 
         controls_row.addStretch()
 
@@ -678,14 +810,13 @@ class CutGutApp(QMainWindow):
 
         main_layout.addWidget(trim_card)
 
-        # 4. Centrum decyzji usera: Panel Planu, Oceny Jakości i Próbki
+        # 4. Centrum decyzji: Panel Planu, Jakości & Próbki
         self.planCard = QFrame()
         self.planCard.setStyleSheet('background-color: #1e293b; border-radius: 8px; border: 1px solid #334155;')
         plan_layout = QVBoxLayout(self.planCard)
         plan_layout.setContentsMargins(14, 8, 14, 8)
         plan_layout.setSpacing(4)
 
-        # Linia 1: Badge Jakości + Przycisk Próbki
         q_row = QHBoxLayout()
         self.lblPlanTitle = QLabel('📊 Plan eksportu')
         self.lblPlanTitle.setStyleSheet('font-weight: bold; color: #94a3b8; font-size: 12px;')
@@ -703,12 +834,10 @@ class CutGutApp(QMainWindow):
         q_row.addWidget(self.lblQualityBadge)
         plan_layout.addLayout(q_row)
 
-        # Linia 2: Parametry techniczne
         self.lblPlanDetails = QLabel('Wybierz wideo, aby zobaczyć planowane parametry kodowania.')
         self.lblPlanDetails.setStyleSheet('font-size: 13px; font-weight: 600; color: #f8fafc;')
         plan_layout.addWidget(self.lblPlanDetails)
 
-        # Linia 3: Opis jakości i Wskazówka
         self.lblPlanTip = QLabel('')
         self.lblPlanTip.setStyleSheet('font-size: 12px; color: #38bdf8;')
         self.lblPlanTip.setWordWrap(True)
@@ -744,7 +873,6 @@ class CutGutApp(QMainWindow):
         row_cfg.addWidget(self.modeCombo)
         ctrl_layout.addLayout(row_cfg)
 
-        # Rząd akcji głównych
         row_act = QHBoxLayout()
         self.btnCompress = QPushButton()
         self.btnCompress.setStyleSheet('background-color: #2563eb; font-size: 13px; padding: 9px 18px; font-weight: bold;')
@@ -805,38 +933,51 @@ class CutGutApp(QMainWindow):
         container.setLayout(main_layout)
         self.setCentralWidget(container)
 
-        # Sygnały odtwarzacza
         self.mediaPlayer.positionChanged.connect(self.position_changed)
         self.mediaPlayer.durationChanged.connect(self.duration_changed)
         self.positionSlider.sliderMoved.connect(self.set_position)
+
+    def startup_maintenance(self):
+        # Usuń pozostałości po poprzednim update (.bak, .new, updater.bat)
+        base_dir = encoder.get_base_dir()
+        for f in ['CutGut.exe.bak', 'CutGut.exe.new', 'cutgut_updater.bat']:
+            p = os.path.join(base_dir, f)
+            if os.path.exists(p):
+                try: os.remove(p)
+                except Exception: pass
+
+        # Sprawdź aktualizacje w tle, jeśli włączone
+        if self.auto_check_updates:
+            self.bg_update_worker = update_service.CheckUpdateWorker(__version__, self.include_prerelease)
+            self.bg_update_worker.finished_signal.connect(self.on_background_update_found)
+            self.bg_update_worker.start()
+
+    def on_background_update_found(self, rel: Optional[update_service.ReleaseInfo]):
+        if rel:
+            dlg = UpdateAvailableDialog(self, rel, __version__, self.current_lang)
+            dlg.exec()
 
     def keyPressEvent(self, event):
         key = event.key()
         modifiers = event.modifiers()
         
-        # [I] = Start z playhead
         if key == Qt.Key.Key_I:
             self.set_start()
             event.accept()
-        # [O] = Koniec z playhead
         elif key == Qt.Key.Key_O:
             self.set_end()
             event.accept()
-        # [Spacja] = Play / Pauza
         elif key == Qt.Key.Key_Space:
             self.play_pause()
             event.accept()
-        # [←] = -1s lub -1 klatka (z Shiftem)
         elif key == Qt.Key.Key_Left:
             step_ms = int(1000.0 / max(self.video_fps, 1.0)) if (modifiers & Qt.KeyboardModifier.ShiftModifier) else 1000
             self.mediaPlayer.setPosition(max(self.mediaPlayer.position() - step_ms, 0))
             event.accept()
-        # [→] = +1s lub +1 klatka (z Shiftem)
         elif key == Qt.Key.Key_Right:
             step_ms = int(1000.0 / max(self.video_fps, 1.0)) if (modifiers & Qt.KeyboardModifier.ShiftModifier) else 1000
             self.mediaPlayer.setPosition(min(self.mediaPlayer.position() + step_ms, self.mediaPlayer.duration()))
             event.accept()
-        # [Escape] = Anuluj
         elif key == Qt.Key.Key_Escape:
             if self.worker and self.worker.isRunning():
                 self.cancel_compression()
@@ -858,23 +999,28 @@ class CutGutApp(QMainWindow):
             self.current_lang,
             self.custom_output_dir,
             self.auto_open_folder,
-            self.auto_preview_result
+            self.auto_ab_compare,
+            self.auto_check_updates,
+            self.include_prerelease
         )
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.cleanup_policy = dlg.selected_policy
             self.custom_output_dir = dlg.output_dir
             self.auto_open_folder = dlg.auto_open
-            self.auto_preview_result = dlg.auto_preview
+            self.auto_ab_compare = dlg.auto_ab
+            self.auto_check_updates = dlg.auto_check_updates
+            self.include_prerelease = dlg.include_prerelease
 
             self.settings.setValue('cleanup_policy', self.cleanup_policy)
             self.settings.setValue('output_directory', self.custom_output_dir)
             self.settings.setValue('auto_open_folder', 'true' if self.auto_open_folder else 'false')
-            self.settings.setValue('auto_preview_result', 'true' if self.auto_preview_result else 'false')
+            self.settings.setValue('auto_ab_compare', 'true' if self.auto_ab_compare else 'false')
+            self.settings.setValue('auto_check_updates', 'true' if self.auto_check_updates else 'false')
+            self.settings.setValue('include_prerelease', 'true' if self.include_prerelease else 'false')
 
     def retranslate_ui(self):
         self.setWindowTitle(self.t('title').format(version=__version__))
 
-        # Przyciski
         self.btnStart.setText(self.t('btn_set_in'))
         self.btnEnd.setText(self.t('btn_set_out'))
         self.chkLoop.setText(self.t('chk_loop'))
@@ -885,20 +1031,14 @@ class CutGutApp(QMainWindow):
         self.btnCancel.setText(self.t('btn_cancel'))
         self.lblPlanTitle.setText(f"📊 {self.t('plan_box_title')}")
         self.btnTestSample.setText(self.t('btn_test_sample'))
-        self.lblPreviewHeader.setText(self.t('preview_label'))
-        self.btnViewSource.setText(self.t('preview_source_btn'))
-        self.btnViewResult.setText(self.t('preview_result_btn') if self.active_media_mode != 'sample' else self.t('preview_sample_btn'))
         self.videoWidget.setToolTip(self.t('video_tooltip'))
 
-        # Zakres czasu
         self.update_range_text()
 
-        # Status początkowy
         if not self.input_file:
             self.statusLabel.setText(self.t('ready_status'))
             self.lblSourceFile.setText(self.t('lbl_no_file'))
 
-        # Presety rozmiaru
         cur_limit_idx = max(self.limitCombo.currentIndex(), 0)
         self.limitCombo.blockSignals(True)
         self.limitCombo.clear()
@@ -909,7 +1049,6 @@ class CutGutApp(QMainWindow):
         self.limitCombo.setCurrentIndex(cur_limit_idx)
         self.limitCombo.blockSignals(False)
 
-        # Enkodery
         cur_mode_idx = max(self.modeCombo.currentIndex(), 0)
         self.modeCombo.blockSignals(True)
         self.modeCombo.clear()
@@ -974,11 +1113,6 @@ class CutGutApp(QMainWindow):
     def load_video(self, file_path: str):
         if file_path and os.path.exists(file_path):
             self.input_file = file_path
-            self.preview_result_path = ''
-            self.preview_sample_path = ''
-            self.active_media_mode = 'source'
-            self.abContainer.setVisible(False)
-
             try:
                 self.video_info = encoder.probe_video(file_path)
                 self.video_fps = self.video_info.fps
@@ -1019,10 +1153,9 @@ class CutGutApp(QMainWindow):
 
     def duration_changed(self, dur):
         self.positionSlider.setRange(0, dur)
-        if self.active_media_mode == 'source':
-            self.start_ms = 0
-            self.end_ms = dur
-            self.update_range_text()
+        self.start_ms = 0
+        self.end_ms = dur
+        self.update_range_text()
 
     def format_time(self, ms: int) -> str:
         s = ms // 1000
@@ -1071,11 +1204,9 @@ class CutGutApp(QMainWindow):
         )
         q: encoder.QualityAssessment = plan['quality']
 
-        # 1. Badge jakości
         self.lblQualityBadge.setText(f"● {q.label}")
         self.lblQualityBadge.setStyleSheet(f"font-weight: bold; font-size: 13px; color: {q.color};")
 
-        # 2. Szczegóły techniczne
         if plan['is_remux']:
             self.lblPlanDetails.setText(
                 f"{self.video_info.width}×{self.video_info.height} · {self.video_fps:.0f} FPS · Błyskawiczny Remux (Direct Stream Copy) · Limit: {target_mb} MB"
@@ -1086,7 +1217,6 @@ class CutGutApp(QMainWindow):
                 f"{plan['out_width']}×{plan['out_height']} · {plan['out_fps']:.0f} FPS · {enc_name} · ~{plan['video_kbps']} kbps · Cel: ~{plan['target_bytes']/1000000:.1f} MB (Limit: {target_mb:.1f} MB)"
             )
 
-        # 3. Opis i Wskazówka
         tip_text = f"<b>{q.description}</b>"
         if q.tip:
             tip_text += f"<br><span style='color: #38bdf8;'>💡 <b>Wskazówka:</b> {q.tip}</span>"
@@ -1120,49 +1250,65 @@ class CutGutApp(QMainWindow):
             plan=plan,
             preset_mode=mode
         )
-        self.sample_worker.finished_signal.connect(self.on_sample_preview_finished)
+        self.sample_worker.finished_signal.connect(lambda sp: self.on_sample_preview_finished(sp, cur_center_s, plan, mode))
         self.sample_worker.error_signal.connect(self.on_sample_preview_error)
         self.sample_worker.start()
 
-    def on_sample_preview_finished(self, sample_path: str):
+    def on_sample_preview_finished(self, sample_path: str, center_s: float, plan: dict, mode: str):
         self.btnTestSample.setEnabled(True)
-        self.preview_sample_path = sample_path
         self.statusLabel.setText(self.t('sample_done'))
-        self.btnViewResult.setText(self.t('preview_sample_btn'))
-        self.abContainer.setVisible(True)
-        self.switch_preview_media('sample')
+
+        half_dur = 3.0
+        start_s = max(center_s - half_dur, 0.0)
+        dur_s = 6.0
+        actual_size = os.path.getsize(sample_path) if os.path.exists(sample_path) else 0
+
+        res = encoder.ExportResult(
+            input_path=self.input_file,
+            output_path=sample_path,
+            start_s=start_s,
+            end_s=start_s + dur_s,
+            duration_s=dur_s,
+            target_mb=self.get_selected_target_mb(),
+            actual_size_bytes=actual_size,
+            is_remux=False,
+            is_sample=True,
+            plan=plan,
+            preset_mode=mode,
+            cleanup_policy="never"
+        )
+        self.open_ab_comparison(res)
 
     def on_sample_preview_error(self, err_msg: str):
         self.btnTestSample.setEnabled(True)
         self.statusLabel.setText(f"❌ {err_msg}")
         QMessageBox.warning(self, "Błąd próbki jakości", err_msg)
 
-    def switch_preview_media(self, mode: str):
-        pos = self.mediaPlayer.position()
-        was_playing = (self.mediaPlayer.playbackState() == QMediaPlayer.PlaybackState.PlayingState)
+    def open_ab_comparison(self, result: encoder.ExportResult):
+        self.comparison_dialog = QualityComparisonDialog(self, result, self.current_lang)
+        self.comparison_dialog.closed_signal.connect(self.on_comparison_closed)
+        self.comparison_dialog.show()
 
-        if mode == 'source':
-            if not self.input_file: return
-            self.active_media_mode = 'source'
-            self.mediaPlayer.setSource(QUrl.fromLocalFile(self.input_file))
-            self.btnViewSource.setStyleSheet('background-color: #2563eb; font-size: 12px; padding: 5px 10px;')
-            self.btnViewResult.setStyleSheet('background-color: #1e293b; color: #94a3b8; font-size: 12px; padding: 5px 10px;')
-        elif mode == 'result':
-            if not self.preview_result_path or not os.path.exists(self.preview_result_path): return
-            self.active_media_mode = 'result'
-            self.mediaPlayer.setSource(QUrl.fromLocalFile(self.preview_result_path))
-            self.btnViewSource.setStyleSheet('background-color: #1e293b; color: #94a3b8; font-size: 12px; padding: 5px 10px;')
-            self.btnViewResult.setStyleSheet('background-color: #059669; font-size: 12px; padding: 5px 10px;')
-        elif mode == 'sample':
-            if not self.preview_sample_path or not os.path.exists(self.preview_sample_path): return
-            self.active_media_mode = 'sample'
-            self.mediaPlayer.setSource(QUrl.fromLocalFile(self.preview_sample_path))
-            self.btnViewSource.setStyleSheet('background-color: #1e293b; color: #94a3b8; font-size: 12px; padding: 5px 10px;')
-            self.btnViewResult.setStyleSheet('background-color: #0e7490; font-size: 12px; padding: 5px 10px;')
+    def on_comparison_closed(self, result: encoder.ExportResult):
+        # Dopiero po zamknięciu okna A/B uruchamiamy politykę czyszczenia oryginału
+        if not result.is_sample and result.cleanup_policy != "never":
+            self.execute_cleanup_policy(result.input_path, result.output_path, result.cleanup_policy)
 
-        self.mediaPlayer.setPosition(pos)
-        if was_playing:
-            self.mediaPlayer.play()
+    def execute_cleanup_policy(self, input_path: str, output_path: str, policy: str):
+        if not os.path.exists(output_path) or os.path.getsize(output_path) <= 0:
+            return
+
+        if policy == encoder.SourceCleanupPolicy.ASK.value:
+            res = QMessageBox.question(
+                self, self.t('ask_cleanup_title'),
+                self.t('ask_cleanup_msg').format(path=os.path.basename(input_path)),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if res == QMessageBox.StandardButton.Yes:
+                encoder.cleanup_source_file(input_path, output_path, encoder.SourceCleanupPolicy.TRASH)
+        elif policy in (encoder.SourceCleanupPolicy.TRASH.value, encoder.SourceCleanupPolicy.DELETE_PERMANENTLY.value):
+            encoder.cleanup_source_file(input_path, output_path, encoder.SourceCleanupPolicy(policy))
 
     def on_limit_changed(self, idx: int):
         if idx == 4:
@@ -1253,8 +1399,7 @@ class CutGutApp(QMainWindow):
             elif job.status == 'cancelled': st_text = '🛑 Anulowano' if self.current_lang == 'pl' else '🛑 Cancelled'
             self.queueTable.setItem(row, 4, QTableWidgetItem(st_text))
 
-            # Akcja w tabeli (Podgląd / Usuń)
-            act_text = 'Podgląd' if job.status == 'finished' else 'Usuń'
+            act_text = 'A/B Podgląd' if job.status == 'finished' else 'Usuń'
             item_act = QTableWidgetItem(act_text)
             item_act.setForeground(QColor('#60a5fa' if job.status == 'finished' else '#f87171'))
             self.queueTable.setItem(row, 5, item_act)
@@ -1264,12 +1409,28 @@ class CutGutApp(QMainWindow):
             return
         job = self.queue[row]
 
-        if col == 5: # Kolumna akcji
+        if col == 5:
             if job.status == 'finished' and os.path.exists(job.output_path):
-                self.preview_result_path = job.output_path
-                self.abContainer.setVisible(True)
-                self.btnViewResult.setText(self.t('preview_result_btn'))
-                self.switch_preview_media('result')
+                dur_s = max(job.end_s - job.start_s, 0.1)
+                try: info = encoder.probe_video(job.input_path)
+                except Exception: info = None
+                plan = encoder.calculate_plan(info, job.start_s, job.end_s, job.target_mb, (job.preset_mode == 'CPU_HEVC'), job.input_path, self.current_lang) if info else None
+
+                res = encoder.ExportResult(
+                    input_path=job.input_path,
+                    output_path=job.output_path,
+                    start_s=job.start_s,
+                    end_s=job.end_s,
+                    duration_s=dur_s,
+                    target_mb=job.target_mb,
+                    actual_size_bytes=job.result_size,
+                    is_remux=plan['is_remux'] if plan else False,
+                    is_sample=False,
+                    plan=plan,
+                    preset_mode=job.preset_mode,
+                    cleanup_policy="never"
+                )
+                self.open_ab_comparison(res)
             elif job.status in ('pending', 'cancelled', 'error'):
                 self.queue.pop(row)
                 self.update_queue_table()
@@ -1351,33 +1512,37 @@ class CutGutApp(QMainWindow):
         ))
         self.update_queue_table()
 
-        # Aktywacja podglądu wyniku w odtwarzaczu (A/B)
-        self.preview_result_path = out_path
-        self.btnViewResult.setText(self.t('preview_result_btn'))
-        self.abContainer.setVisible(True)
-
-        if self.auto_preview_result:
-            self.switch_preview_media('result')
-
-        # Obsługa polityki kasowania pliku źródłowego (SourceCleanupPolicy)
-        if cur_job and os.path.exists(out_path) and size_bytes > 0:
-            pol = cur_job.cleanup_policy
-            if pol == encoder.SourceCleanupPolicy.ASK.value:
-                res = QMessageBox.question(
-                    self, self.t('ask_cleanup_title'),
-                    self.t('ask_cleanup_msg').format(path=os.path.basename(cur_job.input_path)),
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.No
-                )
-                if res == QMessageBox.StandardButton.Yes:
-                    encoder.cleanup_source_file(cur_job.input_path, out_path, encoder.SourceCleanupPolicy.TRASH)
-            elif pol in (encoder.SourceCleanupPolicy.TRASH.value, encoder.SourceCleanupPolicy.DELETE_PERMANENTLY.value):
-                encoder.cleanup_source_file(cur_job.input_path, out_path, encoder.SourceCleanupPolicy(pol))
-
         if self.auto_open_folder:
             out_dir = os.path.dirname(out_path)
             if os.path.exists(out_dir):
                 os.startfile(out_dir)
+
+        # Przygotuj ExportResult
+        if cur_job:
+            dur_s = max(cur_job.end_s - cur_job.start_s, 0.1)
+            try: info = encoder.probe_video(cur_job.input_path)
+            except Exception: info = None
+            plan = encoder.calculate_plan(info, cur_job.start_s, cur_job.end_s, cur_job.target_mb, (cur_job.preset_mode == 'CPU_HEVC'), cur_job.input_path, self.current_lang) if info else None
+
+            res = encoder.ExportResult(
+                input_path=cur_job.input_path,
+                output_path=out_path,
+                start_s=cur_job.start_s,
+                end_s=cur_job.end_s,
+                duration_s=dur_s,
+                target_mb=cur_job.target_mb,
+                actual_size_bytes=size_bytes,
+                is_remux=plan['is_remux'] if plan else False,
+                is_sample=False,
+                plan=plan,
+                preset_mode=cur_job.preset_mode,
+                cleanup_policy=cur_job.cleanup_policy
+            )
+
+            if self.auto_ab_compare:
+                self.open_ab_comparison(res)
+            elif cur_job.cleanup_policy != "never":
+                self.execute_cleanup_policy(cur_job.input_path, out_path, cur_job.cleanup_policy)
 
         # Kolejne zadanie z kolejki
         self.process_next_job()
@@ -1391,8 +1556,6 @@ class CutGutApp(QMainWindow):
         self.statusLabel.setText(self.t('error_status').format(msg=err_msg))
         self.update_queue_table()
         QMessageBox.critical(self, self.t('error_dialog_title'), err_msg)
-
-        # Kontynuuj kolejne zadania
         self.process_next_job()
 
 if __name__ == '__main__':
