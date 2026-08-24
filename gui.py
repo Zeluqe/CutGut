@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout, QPushButton, QLabel, QSlider,
     QFileDialog, QProgressBar, QStyle, QComboBox, QMessageBox,
     QCheckBox, QInputDialog, QDialog, QFrame, QTableWidgetItem,
-    QScrollArea, QSizePolicy
+    QScrollArea, QSizePolicy, QGridLayout
 )
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QThread, QSettings, QPoint
@@ -26,7 +26,7 @@ from ui.settings_dialog import FluentSettingsDialog
 from ui.queue_drawer import QueueDrawerWidget
 import ui.icons
 
-__version__ = "202608240-6-7"
+__version__ = "202608240-6-8"
 
 TRANSLATIONS = {
     'pl': {
@@ -43,20 +43,20 @@ TRANSLATIONS = {
         'btn_screenshot': 'Klatka PNG',
         'lbl_export_card': 'Konfiguracja eksportu',
         'lbl_plan_card': 'Ocena jakości',
-        'lbl_preset': 'Profil:',
-        'lbl_crop': 'Kadr:',
-        'lbl_limit': 'Limit:',
-        'lbl_encoder': 'Enkoder:',
+        'lbl_preset': 'Profil docelowy:',
+        'lbl_crop': 'Kadr obrazu:',
+        'lbl_limit': 'Limit rozmiaru:',
+        'lbl_encoder': 'Silnik enkodera:',
         'btn_align_left': 'Lewo',
         'btn_align_center': 'Środek',
         'btn_align_right': 'Prawo',
         'btn_add_queue': 'Dodaj do kolejki',
         'btn_compress': 'Przytnij i kompresuj',
         'btn_cancel': 'Anuluj',
-        'btn_test_sample': 'Sprawdź próbkę jakości',
-        'plan_no_video': 'Wybierz film, aby zobaczyć plan eksportu i przewidywaną jakość.',
+        'btn_test_sample': 'Sprawdź próbkę jakości (6s)',
+        'plan_no_video': 'Wybierz plik wideo, aby zobaczyć plan kompresji i estymację jakości.',
         'sample_generating': 'Generowanie próbki jakości (6s wokół kursora)...',
-        'sample_done': 'Próbka gotowa! Otwarto porównanie A/B.',
+        'sample_done': 'Próbka gotowa! Otwarto okno porównania A/B.',
         'screenshot_saved': 'Zapisano klatkę PNG: {name}',
         'toast_in_set': 'Początek (IN): {time}',
         'toast_out_set': 'Koniec (OUT): {time}',
@@ -126,17 +126,17 @@ TRANSLATIONS = {
         'btn_screenshot': 'PNG Frame',
         'lbl_export_card': 'Export Setup',
         'lbl_plan_card': 'Quality Assessment',
-        'lbl_preset': 'Profile:',
-        'lbl_crop': 'Crop:',
-        'lbl_limit': 'Limit:',
-        'lbl_encoder': 'Encoder:',
+        'lbl_preset': 'Target Profile:',
+        'lbl_crop': 'Video Framing:',
+        'lbl_limit': 'Size Limit:',
+        'lbl_encoder': 'Encoder Engine:',
         'btn_align_left': 'Left',
         'btn_align_center': 'Center',
         'btn_align_right': 'Right',
         'btn_add_queue': 'Add to Queue',
         'btn_compress': 'Trim and Compress',
         'btn_cancel': 'Cancel',
-        'btn_test_sample': 'Test Quality Sample',
+        'btn_test_sample': 'Test Quality Sample (6s)',
         'plan_no_video': 'Select a video to see export plan and quality assessment.',
         'sample_generating': 'Generating quality sample (6s around playhead)...',
         'sample_done': 'Sample ready! Opened A/B comparison window.',
@@ -323,7 +323,7 @@ class CutGutApp(QMainWindow):
         return lang_dict.get(key, TRANSLATIONS['en'].get(key, ''))
 
     def init_ui(self):
-        # 1. Outer Scroll Area (Keeps Video Preview Prominent and Large)
+        # 1. Outer Scroll Area (Enables seamless scrolling without shrinking video preview)
         self.scrollArea = QScrollArea(self)
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setFrameShape(QFrame.Shape.NoFrame)
@@ -333,13 +333,13 @@ class CutGutApp(QMainWindow):
 
         scroll_content = QWidget()
         main_layout = QVBoxLayout(scroll_content)
-        main_layout.setContentsMargins(16, 12, 16, 14)
-        main_layout.setSpacing(10)
+        main_layout.setContentsMargins(16, 12, 16, 16)
+        main_layout.setSpacing(12)
 
-        # 2. Sleek Top Action Bar (Integrated Controls)
+        # 2. Sleek Top Action Bar (Static Position - Right cluster never shifts)
         top_bar = QHBoxLayout()
         top_bar.setContentsMargins(2, 0, 2, 0)
-        top_bar.setSpacing(8)
+        top_bar.setSpacing(10)
 
         self.btnHeaderOpen = QPushButton(self.t('btn_open_file'))
         self.btnHeaderOpen.setIcon(ui.icons.get_icon('folder', '#f4f4f6', 18))
@@ -351,30 +351,35 @@ class CutGutApp(QMainWindow):
         self.lblCurrentFile.setStyleSheet("color: #a1a1aa; font-weight: 600; font-size: 12px; margin-left: 6px;")
         top_bar.addWidget(self.lblCurrentFile, 1)
 
+        # Static Right Cluster
+        right_top_cluster = QHBoxLayout()
+        right_top_cluster.setSpacing(8)
+
         self.langCombo = QComboBox()
         self.langCombo.addItems(['PL', 'EN'])
-        self.langCombo.setFixedWidth(66)
+        self.langCombo.setFixedWidth(68)
         self.langCombo.setCurrentIndex(0 if self.current_lang == 'pl' else 1)
         self.langCombo.currentIndexChanged.connect(self.on_lang_changed)
-        top_bar.addWidget(self.langCombo)
+        right_top_cluster.addWidget(self.langCombo)
 
         self.btnHelp = QPushButton()
         self.btnHelp.setIcon(ui.icons.get_icon('help', '#a1a1aa', 18))
         self.btnHelp.setFixedSize(36, 32)
         self.btnHelp.setToolTip(self.t('tooltip_help'))
         self.btnHelp.clicked.connect(self.open_help)
-        top_bar.addWidget(self.btnHelp)
+        right_top_cluster.addWidget(self.btnHelp)
 
         self.btnSettings = QPushButton()
         self.btnSettings.setIcon(ui.icons.get_icon('settings', '#a1a1aa', 18))
         self.btnSettings.setFixedSize(36, 32)
         self.btnSettings.setToolTip(self.t('tooltip_settings'))
         self.btnSettings.clicked.connect(self.open_settings)
-        top_bar.addWidget(self.btnSettings)
+        right_top_cluster.addWidget(self.btnSettings)
 
+        top_bar.addLayout(right_top_cluster)
         main_layout.addLayout(top_bar)
 
-        # 3. Video Player Canvas (Large, Prominent Default Height: 380px)
+        # 3. Video Player Canvas (Large, Prominent 380px Canvas)
         player_container = QWidget()
         player_container_layout = QVBoxLayout(player_container)
         player_container_layout.setContentsMargins(0, 0, 0, 0)
@@ -387,7 +392,7 @@ class CutGutApp(QMainWindow):
         self.toast = ToastNotification(self)
         main_layout.addWidget(player_container)
 
-        # 4. Timeline & Media Controls Card
+        # 4. Timeline & Static-Aligned Media Controls Card
         timeline_card = FluentCard()
         timeline_layout = QVBoxLayout(timeline_card)
         timeline_layout.setContentsMargins(14, 10, 14, 10)
@@ -400,7 +405,7 @@ class CutGutApp(QMainWindow):
         self.timeline.marker_set.connect(self.on_marker_set)
         timeline_layout.addWidget(self.timeline)
 
-        # Player Controls Row
+        # Player Controls Row (All labels have strict fixed widths to prevent shifting/jumping)
         ctrl_row = QHBoxLayout()
         ctrl_row.setSpacing(8)
 
@@ -412,16 +417,19 @@ class CutGutApp(QMainWindow):
         ctrl_row.addWidget(self.playBtn)
 
         self.timeLabel = QLabel("00:00.00 / 00:00.00")
-        self.timeLabel.setStyleSheet("font-weight: 700; font-size: 13px; color: #f4f4f6; margin-left: 4px;")
+        self.timeLabel.setFixedWidth(130)
+        self.timeLabel.setStyleSheet("font-weight: 700; font-size: 13px; color: #f4f4f6; font-family: 'Segoe UI Variable Text', Consolas, monospace;")
         ctrl_row.addWidget(self.timeLabel)
 
         self.btnSetIn = QPushButton(self.t('btn_set_in'))
-        self.btnSetIn.setStyleSheet("background-color: #059669; color: white; padding: 5px 12px; font-size: 11px; font-weight: bold;")
+        self.btnSetIn.setIcon(ui.icons.get_icon('bookmark', '#ffffff', 13))
+        self.btnSetIn.setStyleSheet("background-color: #059669; color: white; padding: 5px 10px; font-size: 11px; font-weight: bold;")
         self.btnSetIn.clicked.connect(self.set_start)
         ctrl_row.addWidget(self.btnSetIn)
 
         self.lblInTime = QLabel("IN: 00:00.00")
-        self.lblInTime.setStyleSheet("color: #10b981; font-weight: 700; font-size: 12px;")
+        self.lblInTime.setFixedWidth(85)
+        self.lblInTime.setStyleSheet("color: #10b981; font-weight: 700; font-size: 12px; font-family: 'Segoe UI Variable Text', Consolas, monospace;")
         ctrl_row.addWidget(self.lblInTime)
 
         self.lblDuration = QLabel(self.t('lbl_duration').format(dur=0.0))
@@ -430,11 +438,14 @@ class CutGutApp(QMainWindow):
         ctrl_row.addWidget(self.lblDuration, 1)
 
         self.lblOutTime = QLabel("OUT: 00:00.00")
-        self.lblOutTime.setStyleSheet("color: #ef4444; font-weight: 700; font-size: 12px;")
+        self.lblOutTime.setFixedWidth(90)
+        self.lblOutTime.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.lblOutTime.setStyleSheet("color: #ef4444; font-weight: 700; font-size: 12px; font-family: 'Segoe UI Variable Text', Consolas, monospace;")
         ctrl_row.addWidget(self.lblOutTime)
 
         self.btnSetOut = QPushButton(self.t('btn_set_out'))
-        self.btnSetOut.setStyleSheet("background-color: #dc2626; color: white; padding: 5px 12px; font-size: 11px; font-weight: bold;")
+        self.btnSetOut.setIcon(ui.icons.get_icon('flag', '#ffffff', 13))
+        self.btnSetOut.setStyleSheet("background-color: #dc2626; color: white; padding: 5px 10px; font-size: 11px; font-weight: bold;")
         self.btnSetOut.clicked.connect(self.set_end)
         ctrl_row.addWidget(self.btnSetOut)
 
@@ -476,7 +487,7 @@ class CutGutApp(QMainWindow):
         export_layout.setSpacing(8)
 
         self.lblExportTitle = QLabel(self.t('lbl_export_card'))
-        self.lblExportTitle.setStyleSheet("font-size: 13px; font-weight: 700; color: #60cdff;")
+        self.lblExportTitle.setStyleSheet("font-size: 14px; font-weight: 700; color: #60cdff;")
         export_layout.addWidget(self.lblExportTitle)
 
         # Row 1: Profile & Crop
@@ -590,7 +601,7 @@ class CutGutApp(QMainWindow):
 
         plan_hdr = QHBoxLayout()
         self.lblPlanTitle = QLabel(self.t('lbl_plan_card'))
-        self.lblPlanTitle.setStyleSheet("font-size: 13px; font-weight: 700; color: #60cdff;")
+        self.lblPlanTitle.setStyleSheet("font-size: 14px; font-weight: 700; color: #60cdff;")
         plan_hdr.addWidget(self.lblPlanTitle)
         plan_hdr.addStretch()
 
@@ -610,7 +621,7 @@ class CutGutApp(QMainWindow):
 
         self.btnTestSample = QPushButton(self.t('btn_test_sample'))
         self.btnTestSample.setIcon(ui.icons.get_icon('flask', '#ffffff', 16))
-        self.btnTestSample.setStyleSheet("background-color: #0e7490; color: white; padding: 7px 12px;")
+        self.btnTestSample.setStyleSheet("background-color: #0e7490; color: white; padding: 8px 14px; font-weight: 600;")
         self.btnTestSample.setEnabled(False)
         self.btnTestSample.clicked.connect(self.create_sample_preview)
         plan_layout.addWidget(self.btnTestSample)
