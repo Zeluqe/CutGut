@@ -13,6 +13,7 @@ from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QTimer
 from PyQt6.QtGui import QColor, QFont
 import encoder
 import ui.icons
+from ui.theme import apply_windows_theme
 
 class ClickableVideoWidget(QVideoWidget):
     clicked_signal = pyqtSignal()
@@ -72,18 +73,21 @@ class QualityComparisonDialog(QDialog):
             QLabel { color: #f4f4f6; font-family: 'Segoe UI Variable', 'Segoe UI', system-ui; font-size: 13px; }
             QPushButton { 
                 border-radius: 6px; padding: 7px 14px; color: #f4f4f6; 
-                font-weight: 600; background-color: #222226; border: 1px solid rgba(255, 255, 255, 0.1); 
+                font-weight: 600; background-color: rgba(34, 34, 42, 0.70); border: 1px solid rgba(255, 255, 255, 0.1); 
             }
-            QPushButton:hover { background-color: #2c2c33; border: 1px solid #0078d4; }
+            QPushButton:hover { background-color: rgba(42, 42, 52, 0.85); border: 1px solid #0078d4; }
             QSlider::groove:horizontal {
-                border: none; height: 6px; background: #222226; border-radius: 3px;
+                border: none; height: 5px; background: rgba(42, 42, 52, 0.85); border-radius: 2.5px;
+            }
+            QSlider::sub-page:horizontal {
+                background: #0078d4; border-radius: 2.5px;
             }
             QSlider::handle:horizontal {
-                background: #0078d4; border: 2px solid #ffffff;
-                width: 16px; height: 16px; margin: -5px 0; border-radius: 8px;
+                background: #ffffff; border: 3px solid #0078d4;
+                width: 16px; height: 16px; margin: -5.5px 0; border-radius: 8px;
             }
             QCheckBox { color: #a1a1aa; font-weight: 500; }
-            QCheckBox::indicator { width: 16px; height: 16px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.16); background: #222226; }
+            QCheckBox::indicator { width: 18px; height: 18px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(34, 34, 42, 0.7); }
             QCheckBox::indicator:checked { background: #0078d4; border: 1px solid #0078d4; }
         ''')
 
@@ -108,8 +112,8 @@ class QualityComparisonDialog(QDialog):
 
         # 2. Side-by-side Video
         video_box = QHBoxLayout()
-        self.videoSource.setStyleSheet('background-color: black; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.1);')
-        self.videoTarget.setStyleSheet('background-color: black; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.1);')
+        self.videoSource.setStyleSheet('background-color: black; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1);')
+        self.videoTarget.setStyleSheet('background-color: black; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1);')
         self.videoSource.setMinimumHeight(350)
         self.videoTarget.setMinimumHeight(350)
 
@@ -122,9 +126,9 @@ class QualityComparisonDialog(QDialog):
 
         # 3. Controls Card
         ctrl_card = QFrame()
-        ctrl_card.setStyleSheet('background-color: #1c1c1f; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08);')
+        ctrl_card.setStyleSheet('background-color: rgba(28, 28, 34, 0.78); border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08);')
         ctrl_layout = QVBoxLayout(ctrl_card)
-        ctrl_layout.setContentsMargins(10, 6, 10, 6)
+        ctrl_layout.setContentsMargins(12, 8, 12, 8)
         ctrl_layout.setSpacing(6)
 
         self.timelineSlider = QSlider(Qt.Orientation.Horizontal)
@@ -136,7 +140,7 @@ class QualityComparisonDialog(QDialog):
         self.playBtn = QPushButton()
         self.playBtn.setIcon(ui.icons.get_icon('play', '#ffffff', 18))
         self.playBtn.setFixedSize(40, 32)
-        self.playBtn.setStyleSheet('background-color: #0078d4;')
+        self.playBtn.setStyleSheet('background-color: #0078d4; border-radius: 6px;')
         self.playBtn.clicked.connect(self.play_pause)
         btn_row.addWidget(self.playBtn)
 
@@ -190,7 +194,7 @@ class QualityComparisonDialog(QDialog):
 
         # 4. Info Card
         info_card = QFrame()
-        info_card.setStyleSheet('background-color: #1c1c1f; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08);')
+        info_card.setStyleSheet('background-color: rgba(28, 28, 34, 0.78); border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08);')
         info_layout = QHBoxLayout(info_card)
         info_layout.setContentsMargins(14, 8, 14, 8)
 
@@ -225,7 +229,7 @@ class QualityComparisonDialog(QDialog):
         info_layout.addWidget(btn_open_folder)
 
         btn_close = QPushButton("Close" if self.lang == 'en' else "Zamknij")
-        btn_close.setStyleSheet('background-color: #0078d4; padding: 7px 16px;')
+        btn_close.setStyleSheet('background-color: #0078d4; color: white; padding: 7px 16px; font-weight: bold;')
         btn_close.clicked.connect(self.accept)
         info_layout.addWidget(btn_close)
 
@@ -308,9 +312,46 @@ class QualityComparisonDialog(QDialog):
         if os.path.exists(out_dir):
             os.startfile(out_dir)
 
+    def cleanup_and_stop(self):
+        """Completely halts all background players and unloads media sources so audio never leaks."""
+        try:
+            if hasattr(self, 'syncTimer'):
+                self.syncTimer.stop()
+            if hasattr(self, 'playerSource'):
+                self.playerSource.stop()
+                self.playerSource.setSource(QUrl())
+            if hasattr(self, 'playerTarget'):
+                self.playerTarget.stop()
+                self.playerTarget.setSource(QUrl())
+            if hasattr(self, 'audioSource'):
+                self.audioSource.setMuted(True)
+            if hasattr(self, 'audioTarget'):
+                self.audioTarget.setMuted(True)
+        except Exception:
+            pass
+
+    def accept(self):
+        self.cleanup_and_stop()
+        self.closed_signal.emit(self.result)
+        super().accept()
+
+    def reject(self):
+        self.cleanup_and_stop()
+        self.closed_signal.emit(self.result)
+        super().reject()
+
     def closeEvent(self, event):
-        self.syncTimer.stop()
-        self.playerSource.stop()
-        self.playerTarget.stop()
+        self.cleanup_and_stop()
         self.closed_signal.emit(self.result)
         super().closeEvent(event)
+
+    def hideEvent(self, event):
+        self.cleanup_and_stop()
+        super().hideEvent(event)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        try:
+            apply_windows_theme(self, is_dark=True)
+        except Exception:
+            pass

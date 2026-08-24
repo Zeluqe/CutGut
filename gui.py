@@ -8,7 +8,8 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
     QHBoxLayout, QPushButton, QLabel, QSlider,
     QFileDialog, QProgressBar, QStyle, QComboBox, QMessageBox,
-    QCheckBox, QInputDialog, QDialog, QFrame, QTableWidgetItem
+    QCheckBox, QInputDialog, QDialog, QFrame, QTableWidgetItem,
+    QScrollArea, QSizePolicy
 )
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QThread, QSettings, QPoint
@@ -25,7 +26,7 @@ from ui.settings_dialog import FluentSettingsDialog
 from ui.queue_drawer import QueueDrawerWidget
 import ui.icons
 
-__version__ = "202608240-6-6"
+__version__ = "202608240-6-7"
 
 TRANSLATIONS = {
     'pl': {
@@ -279,8 +280,8 @@ class CutGutApp(QMainWindow):
         self.auto_check_updates = (self.settings.value('auto_check_updates', 'true') == 'true')
         self.include_prerelease = (self.settings.value('include_prerelease', 'false') == 'true')
 
-        self.setMinimumSize(960, 680)
-        self.resize(1120, 820)
+        self.setMinimumSize(980, 720)
+        self.resize(1140, 840)
         self.setAcceptDrops(True)
 
         self.input_file = ''
@@ -322,19 +323,27 @@ class CutGutApp(QMainWindow):
         return lang_dict.get(key, TRANSLATIONS['en'].get(key, ''))
 
     def init_ui(self):
-        main_widget = QWidget()
-        main_layout = QVBoxLayout(main_widget)
-        main_layout.setContentsMargins(14, 10, 14, 10)
-        main_layout.setSpacing(8)
+        # 1. Outer Scroll Area (Keeps Video Preview Prominent and Large)
+        self.scrollArea = QScrollArea(self)
+        self.scrollArea.setWidgetResizable(True)
+        self.scrollArea.setFrameShape(QFrame.Shape.NoFrame)
+        self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.scrollArea.setStyleSheet("QScrollArea { background: transparent; border: none; }")
 
-        # 1. Sleek Top Action Bar (Integrated Controls)
+        scroll_content = QWidget()
+        main_layout = QVBoxLayout(scroll_content)
+        main_layout.setContentsMargins(16, 12, 16, 14)
+        main_layout.setSpacing(10)
+
+        # 2. Sleek Top Action Bar (Integrated Controls)
         top_bar = QHBoxLayout()
         top_bar.setContentsMargins(2, 0, 2, 0)
         top_bar.setSpacing(8)
 
         self.btnHeaderOpen = QPushButton(self.t('btn_open_file'))
         self.btnHeaderOpen.setIcon(ui.icons.get_icon('folder', '#f4f4f6', 18))
-        self.btnHeaderOpen.setStyleSheet("padding: 6px 14px; font-weight: 700; background-color: #222226;")
+        self.btnHeaderOpen.setStyleSheet("padding: 7px 16px; font-weight: 700; background-color: rgba(34, 34, 42, 0.70);")
         self.btnHeaderOpen.clicked.connect(self.open_file)
         top_bar.addWidget(self.btnHeaderOpen)
 
@@ -351,38 +360,38 @@ class CutGutApp(QMainWindow):
 
         self.btnHelp = QPushButton()
         self.btnHelp.setIcon(ui.icons.get_icon('help', '#a1a1aa', 18))
-        self.btnHelp.setFixedSize(36, 30)
+        self.btnHelp.setFixedSize(36, 32)
         self.btnHelp.setToolTip(self.t('tooltip_help'))
         self.btnHelp.clicked.connect(self.open_help)
         top_bar.addWidget(self.btnHelp)
 
         self.btnSettings = QPushButton()
         self.btnSettings.setIcon(ui.icons.get_icon('settings', '#a1a1aa', 18))
-        self.btnSettings.setFixedSize(36, 30)
+        self.btnSettings.setFixedSize(36, 32)
         self.btnSettings.setToolTip(self.t('tooltip_settings'))
         self.btnSettings.clicked.connect(self.open_settings)
         top_bar.addWidget(self.btnSettings)
 
         main_layout.addLayout(top_bar)
 
-        # 2. Video Player Canvas & Floating Toast (Adaptive Height)
+        # 3. Video Player Canvas (Large, Prominent Default Height: 380px)
         player_container = QWidget()
         player_container_layout = QVBoxLayout(player_container)
         player_container_layout.setContentsMargins(0, 0, 0, 0)
         player_container_layout.setSpacing(0)
 
-        self.cropCanvas.setMinimumHeight(180)
-        player_container_layout.addWidget(self.cropCanvas, 1)
+        self.cropCanvas.setMinimumHeight(380)
+        self.cropCanvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        player_container_layout.addWidget(self.cropCanvas)
 
         self.toast = ToastNotification(self)
+        main_layout.addWidget(player_container)
 
-        main_layout.addWidget(player_container, 3)
-
-        # 3. Timeline & Media Controls Card
+        # 4. Timeline & Media Controls Card
         timeline_card = FluentCard()
         timeline_layout = QVBoxLayout(timeline_card)
-        timeline_layout.setContentsMargins(12, 8, 12, 8)
-        timeline_layout.setSpacing(6)
+        timeline_layout.setContentsMargins(14, 10, 14, 10)
+        timeline_layout.setSpacing(8)
 
         # Rich Fluent Timeline
         self.timeline = FluentTimelineWidget()
@@ -397,7 +406,7 @@ class CutGutApp(QMainWindow):
 
         self.playBtn = QPushButton()
         self.playBtn.setIcon(ui.icons.get_icon('play', '#ffffff', 18))
-        self.playBtn.setFixedSize(38, 30)
+        self.playBtn.setFixedSize(40, 32)
         self.playBtn.setStyleSheet("background-color: #0078d4; border-radius: 6px;")
         self.playBtn.clicked.connect(self.play_pause)
         ctrl_row.addWidget(self.playBtn)
@@ -407,7 +416,7 @@ class CutGutApp(QMainWindow):
         ctrl_row.addWidget(self.timeLabel)
 
         self.btnSetIn = QPushButton(self.t('btn_set_in'))
-        self.btnSetIn.setStyleSheet("background-color: #059669; color: white; padding: 4px 10px; font-size: 11px; font-weight: bold;")
+        self.btnSetIn.setStyleSheet("background-color: #059669; color: white; padding: 5px 12px; font-size: 11px; font-weight: bold;")
         self.btnSetIn.clicked.connect(self.set_start)
         ctrl_row.addWidget(self.btnSetIn)
 
@@ -425,7 +434,7 @@ class CutGutApp(QMainWindow):
         ctrl_row.addWidget(self.lblOutTime)
 
         self.btnSetOut = QPushButton(self.t('btn_set_out'))
-        self.btnSetOut.setStyleSheet("background-color: #dc2626; color: white; padding: 4px 10px; font-size: 11px; font-weight: bold;")
+        self.btnSetOut.setStyleSheet("background-color: #dc2626; color: white; padding: 5px 12px; font-size: 11px; font-weight: bold;")
         self.btnSetOut.clicked.connect(self.set_end)
         ctrl_row.addWidget(self.btnSetOut)
 
@@ -434,7 +443,7 @@ class CutGutApp(QMainWindow):
 
         self.btnScreenshot = QPushButton(self.t('btn_screenshot'))
         self.btnScreenshot.setIcon(ui.icons.get_icon('camera', '#ffffff', 14))
-        self.btnScreenshot.setStyleSheet("background-color: #0f766e; color: white; font-size: 11px; padding: 5px 10px;")
+        self.btnScreenshot.setStyleSheet("background-color: #0f766e; color: white; font-size: 11px; padding: 6px 12px;")
         self.btnScreenshot.setEnabled(False)
         self.btnScreenshot.clicked.connect(self.capture_png_frame)
         ctrl_row.addWidget(self.btnScreenshot)
@@ -456,15 +465,15 @@ class CutGutApp(QMainWindow):
         timeline_layout.addLayout(ctrl_row)
         main_layout.addWidget(timeline_card)
 
-        # 4. Two-Column Fluent Row: Export Setup (Left) & Quality Plan (Right)
+        # 5. Two-Column Fluent Row: Export Setup (Left) & Quality Plan (Right)
         bottom_row = QHBoxLayout()
-        bottom_row.setSpacing(10)
+        bottom_row.setSpacing(12)
 
         # LEFT CARD: Export Setup
         self.exportCard = FluentCard()
         export_layout = QVBoxLayout(self.exportCard)
-        export_layout.setContentsMargins(12, 10, 12, 10)
-        export_layout.setSpacing(6)
+        export_layout.setContentsMargins(14, 12, 14, 12)
+        export_layout.setSpacing(8)
 
         self.lblExportTitle = QLabel(self.t('lbl_export_card'))
         self.lblExportTitle.setStyleSheet("font-size: 13px; font-weight: 700; color: #60cdff;")
@@ -576,8 +585,8 @@ class CutGutApp(QMainWindow):
         # RIGHT CARD: Quality Plan
         self.planCard = FluentCard()
         plan_layout = QVBoxLayout(self.planCard)
-        plan_layout.setContentsMargins(12, 10, 12, 10)
-        plan_layout.setSpacing(6)
+        plan_layout.setContentsMargins(14, 12, 14, 12)
+        plan_layout.setSpacing(8)
 
         plan_hdr = QHBoxLayout()
         self.lblPlanTitle = QLabel(self.t('lbl_plan_card'))
@@ -609,14 +618,14 @@ class CutGutApp(QMainWindow):
         bottom_row.addWidget(self.planCard, 1)
         main_layout.addLayout(bottom_row)
 
-        # 5. Queue Drawer Widget
+        # 6. Queue Drawer Widget (Placed Below Cards - Smooth Scroll Access)
         self.queueDrawer = QueueDrawerWidget(self, self.current_lang)
         self.queueDrawer.job_action_clicked.connect(self.on_queue_action)
         self.queueDrawer.btnClearFinished.clicked.connect(self.clear_finished_jobs)
         self.queueDrawer.setVisible(False)
         main_layout.addWidget(self.queueDrawer)
 
-        # 6. Progress Bar & Status Line
+        # 7. Progress Bar & Status Line
         self.progBar = QProgressBar()
         self.progBar.setFixedHeight(8)
         main_layout.addWidget(self.progBar)
@@ -626,7 +635,8 @@ class CutGutApp(QMainWindow):
         self.statusLabel.setProperty('class', 'Secondary')
         main_layout.addWidget(self.statusLabel)
 
-        self.setCentralWidget(main_widget)
+        self.scrollArea.setWidget(scroll_content)
+        self.setCentralWidget(self.scrollArea)
 
         self.mediaPlayer.positionChanged.connect(self.position_changed)
         self.mediaPlayer.durationChanged.connect(self.duration_changed)
