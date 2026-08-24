@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
     QHBoxLayout, QPushButton, QLabel, QSlider,
     QFileDialog, QProgressBar, QStyle, QComboBox, QMessageBox,
-    QCheckBox, QInputDialog, QDialog, QFrame
+    QCheckBox, QInputDialog, QDialog, QFrame, QTableWidgetItem
 )
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QThread, QSettings, QPoint
@@ -25,20 +25,23 @@ from ui.settings_dialog import FluentSettingsDialog
 from ui.queue_drawer import QueueDrawerWidget
 import ui.icons
 
-__version__ = "202608240-6-5"
+__version__ = "202608240-6-6"
 
 TRANSLATIONS = {
     'pl': {
-        'title': 'CutGut v{version} — Smart Video Trimming & Compression',
+        'title': 'CutGut v{version} — Inteligentne przycinanie i kompresja wideo',
         'btn_open_file': 'Otwórz film',
         'btn_change_file': 'Zmień film',
+        'no_video_selected': 'Nie wybrano filmu',
+        'tooltip_help': 'Skróty klawiszowe i pomoc',
+        'tooltip_settings': 'Ustawienia programu',
         'btn_set_in': 'USTAW IN',
         'btn_set_out': 'USTAW OUT',
         'lbl_duration': 'Długość: {dur:.2f}s',
         'chk_loop': 'Zapętlij',
         'btn_screenshot': 'Klatka PNG',
         'lbl_export_card': 'Konfiguracja eksportu',
-        'lbl_plan_card': 'Jakość i parametry',
+        'lbl_plan_card': 'Ocena jakości',
         'lbl_preset': 'Profil:',
         'lbl_crop': 'Kadr:',
         'lbl_limit': 'Limit:',
@@ -50,6 +53,7 @@ TRANSLATIONS = {
         'btn_compress': 'Przytnij i kompresuj',
         'btn_cancel': 'Anuluj',
         'btn_test_sample': 'Sprawdź próbkę jakości',
+        'plan_no_video': 'Wybierz film, aby zobaczyć plan eksportu i przewidywaną jakość.',
         'sample_generating': 'Generowanie próbki jakości (6s wokół kursora)...',
         'sample_done': 'Próbka gotowa! Otwarto porównanie A/B.',
         'screenshot_saved': 'Zapisano klatkę PNG: {name}',
@@ -57,6 +61,15 @@ TRANSLATIONS = {
         'toast_out_set': 'Koniec (OUT): {time}',
         'toast_job_added': 'Dodano zadanie do kolejki ({count})',
         'toast_export_done': 'Eksport zakończony: {size} MB',
+        'queue_header': 'Kolejka zadań ({count})',
+        'queue_clear_btn': 'Wyczyść zakończone',
+        'queue_status_pending': 'Oczekuje',
+        'queue_status_running': 'Kompresja ({pct}%)',
+        'queue_status_done': 'Gotowe',
+        'queue_status_error': 'Błąd',
+        'queue_status_cancelled': 'Anulowano',
+        'queue_action_ab': 'Widok A/B',
+        'queue_action_delete': 'Usuń',
         'social_presets': [
             'Discord Clip (20 MB)',
             'Discord Nitro (50 MB)',
@@ -102,6 +115,9 @@ TRANSLATIONS = {
         'title': 'CutGut v{version} — Smart Video Trimming & Compression',
         'btn_open_file': 'Open Video',
         'btn_change_file': 'Change Video',
+        'no_video_selected': 'No video selected',
+        'tooltip_help': 'Keyboard Shortcuts & Help',
+        'tooltip_settings': 'Application Settings',
         'btn_set_in': 'SET IN',
         'btn_set_out': 'SET OUT',
         'lbl_duration': 'Duration: {dur:.2f}s',
@@ -117,9 +133,10 @@ TRANSLATIONS = {
         'btn_align_center': 'Center',
         'btn_align_right': 'Right',
         'btn_add_queue': 'Add to Queue',
-        'btn_compress': 'Trim & Compress',
+        'btn_compress': 'Trim and Compress',
         'btn_cancel': 'Cancel',
         'btn_test_sample': 'Test Quality Sample',
+        'plan_no_video': 'Select a video to see export plan and quality assessment.',
         'sample_generating': 'Generating quality sample (6s around playhead)...',
         'sample_done': 'Sample ready! Opened A/B comparison window.',
         'screenshot_saved': 'Saved PNG frame: {name}',
@@ -127,6 +144,15 @@ TRANSLATIONS = {
         'toast_out_set': 'End (OUT): {time}',
         'toast_job_added': 'Job added to queue ({count})',
         'toast_export_done': 'Export finished: {size} MB',
+        'queue_header': 'Job Queue ({count})',
+        'queue_clear_btn': 'Clear Finished',
+        'queue_status_pending': 'Pending',
+        'queue_status_running': 'Encoding ({pct}%)',
+        'queue_status_done': 'Done',
+        'queue_status_error': 'Error',
+        'queue_status_cancelled': 'Cancelled',
+        'queue_action_ab': 'A/B View',
+        'queue_action_delete': 'Delete',
         'social_presets': [
             'Discord Clip (20 MB)',
             'Discord Nitro (50 MB)',
@@ -253,7 +279,8 @@ class CutGutApp(QMainWindow):
         self.auto_check_updates = (self.settings.value('auto_check_updates', 'true') == 'true')
         self.include_prerelease = (self.settings.value('include_prerelease', 'false') == 'true')
 
-        self.setMinimumSize(1080, 880)
+        self.setMinimumSize(960, 680)
+        self.resize(1120, 820)
         self.setAcceptDrops(True)
 
         self.input_file = ''
@@ -297,21 +324,21 @@ class CutGutApp(QMainWindow):
     def init_ui(self):
         main_widget = QWidget()
         main_layout = QVBoxLayout(main_widget)
-        main_layout.setContentsMargins(16, 12, 16, 12)
-        main_layout.setSpacing(10)
+        main_layout.setContentsMargins(14, 10, 14, 10)
+        main_layout.setSpacing(8)
 
-        # 1. Sleek Top Action Bar (Integrated Controls - No Bulky Header Card)
+        # 1. Sleek Top Action Bar (Integrated Controls)
         top_bar = QHBoxLayout()
         top_bar.setContentsMargins(2, 0, 2, 0)
         top_bar.setSpacing(8)
 
         self.btnHeaderOpen = QPushButton(self.t('btn_open_file'))
         self.btnHeaderOpen.setIcon(ui.icons.get_icon('folder', '#f4f4f6', 18))
-        self.btnHeaderOpen.setStyleSheet("padding: 7px 16px; font-weight: 700; background-color: #222226;")
+        self.btnHeaderOpen.setStyleSheet("padding: 6px 14px; font-weight: 700; background-color: #222226;")
         self.btnHeaderOpen.clicked.connect(self.open_file)
         top_bar.addWidget(self.btnHeaderOpen)
 
-        self.lblCurrentFile = QLabel("No video selected")
+        self.lblCurrentFile = QLabel(self.t('no_video_selected'))
         self.lblCurrentFile.setStyleSheet("color: #a1a1aa; font-weight: 600; font-size: 12px; margin-left: 6px;")
         top_bar.addWidget(self.lblCurrentFile, 1)
 
@@ -324,38 +351,38 @@ class CutGutApp(QMainWindow):
 
         self.btnHelp = QPushButton()
         self.btnHelp.setIcon(ui.icons.get_icon('help', '#a1a1aa', 18))
-        self.btnHelp.setFixedSize(36, 32)
-        self.btnHelp.setToolTip("Keyboard Shortcuts & Help")
+        self.btnHelp.setFixedSize(36, 30)
+        self.btnHelp.setToolTip(self.t('tooltip_help'))
         self.btnHelp.clicked.connect(self.open_help)
         top_bar.addWidget(self.btnHelp)
 
         self.btnSettings = QPushButton()
         self.btnSettings.setIcon(ui.icons.get_icon('settings', '#a1a1aa', 18))
-        self.btnSettings.setFixedSize(36, 32)
-        self.btnSettings.setToolTip("Settings")
+        self.btnSettings.setFixedSize(36, 30)
+        self.btnSettings.setToolTip(self.t('tooltip_settings'))
         self.btnSettings.clicked.connect(self.open_settings)
         top_bar.addWidget(self.btnSettings)
 
         main_layout.addLayout(top_bar)
 
-        # 2. Video Player Canvas & Floating Toast
+        # 2. Video Player Canvas & Floating Toast (Adaptive Height)
         player_container = QWidget()
         player_container_layout = QVBoxLayout(player_container)
         player_container_layout.setContentsMargins(0, 0, 0, 0)
         player_container_layout.setSpacing(0)
 
-        self.cropCanvas.setMinimumHeight(390)
+        self.cropCanvas.setMinimumHeight(180)
         player_container_layout.addWidget(self.cropCanvas, 1)
 
         self.toast = ToastNotification(self)
 
-        main_layout.addWidget(player_container, 1)
+        main_layout.addWidget(player_container, 3)
 
         # 3. Timeline & Media Controls Card
         timeline_card = FluentCard()
         timeline_layout = QVBoxLayout(timeline_card)
-        timeline_layout.setContentsMargins(14, 10, 14, 10)
-        timeline_layout.setSpacing(8)
+        timeline_layout.setContentsMargins(12, 8, 12, 8)
+        timeline_layout.setSpacing(6)
 
         # Rich Fluent Timeline
         self.timeline = FluentTimelineWidget()
@@ -370,7 +397,7 @@ class CutGutApp(QMainWindow):
 
         self.playBtn = QPushButton()
         self.playBtn.setIcon(ui.icons.get_icon('play', '#ffffff', 18))
-        self.playBtn.setFixedSize(40, 32)
+        self.playBtn.setFixedSize(38, 30)
         self.playBtn.setStyleSheet("background-color: #0078d4; border-radius: 6px;")
         self.playBtn.clicked.connect(self.play_pause)
         ctrl_row.addWidget(self.playBtn)
@@ -388,7 +415,7 @@ class CutGutApp(QMainWindow):
         self.lblInTime.setStyleSheet("color: #10b981; font-weight: 700; font-size: 12px;")
         ctrl_row.addWidget(self.lblInTime)
 
-        self.lblDuration = QLabel("Duration: 00:00.00")
+        self.lblDuration = QLabel(self.t('lbl_duration').format(dur=0.0))
         self.lblDuration.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lblDuration.setStyleSheet("color: #60cdff; font-weight: 700; font-size: 13px;")
         ctrl_row.addWidget(self.lblDuration, 1)
@@ -431,17 +458,17 @@ class CutGutApp(QMainWindow):
 
         # 4. Two-Column Fluent Row: Export Setup (Left) & Quality Plan (Right)
         bottom_row = QHBoxLayout()
-        bottom_row.setSpacing(12)
+        bottom_row.setSpacing(10)
 
         # LEFT CARD: Export Setup
         self.exportCard = FluentCard()
         export_layout = QVBoxLayout(self.exportCard)
-        export_layout.setContentsMargins(14, 12, 14, 12)
-        export_layout.setSpacing(8)
+        export_layout.setContentsMargins(12, 10, 12, 10)
+        export_layout.setSpacing(6)
 
-        lbl_exp_title = QLabel(self.t('lbl_export_card'))
-        lbl_exp_title.setStyleSheet("font-size: 14px; font-weight: 700; color: #60cdff;")
-        export_layout.addWidget(lbl_exp_title)
+        self.lblExportTitle = QLabel(self.t('lbl_export_card'))
+        self.lblExportTitle.setStyleSheet("font-size: 13px; font-weight: 700; color: #60cdff;")
+        export_layout.addWidget(self.lblExportTitle)
 
         # Row 1: Profile & Crop
         r1 = QHBoxLayout()
@@ -521,7 +548,7 @@ class CutGutApp(QMainWindow):
 
         # Action Buttons Row
         r_act = QHBoxLayout()
-        r_act.setSpacing(8)
+        r_act.setSpacing(6)
 
         self.btnCompress = QPushButton(self.t('btn_compress'))
         self.btnCompress.setIcon(ui.icons.get_icon('scissors', '#ffffff', 18))
@@ -549,32 +576,32 @@ class CutGutApp(QMainWindow):
         # RIGHT CARD: Quality Plan
         self.planCard = FluentCard()
         plan_layout = QVBoxLayout(self.planCard)
-        plan_layout.setContentsMargins(14, 12, 14, 12)
-        plan_layout.setSpacing(8)
+        plan_layout.setContentsMargins(12, 10, 12, 10)
+        plan_layout.setSpacing(6)
 
         plan_hdr = QHBoxLayout()
-        lbl_plan_title = QLabel(self.t('lbl_plan_card'))
-        lbl_plan_title.setStyleSheet("font-size: 14px; font-weight: 700; color: #60cdff;")
-        plan_hdr.addWidget(lbl_plan_title)
+        self.lblPlanTitle = QLabel(self.t('lbl_plan_card'))
+        self.lblPlanTitle.setStyleSheet("font-size: 13px; font-weight: 700; color: #60cdff;")
+        plan_hdr.addWidget(self.lblPlanTitle)
         plan_hdr.addStretch()
 
         self.qualityBadge = QualityBadge()
         plan_hdr.addWidget(self.qualityBadge)
         plan_layout.addLayout(plan_hdr)
 
-        self.lblPlanDetails = QLabel("Select a video to see export plan and quality.")
-        self.lblPlanDetails.setStyleSheet("font-size: 13px; font-weight: 600; color: #f4f4f6; line-height: 1.4;")
+        self.lblPlanDetails = QLabel(self.t('plan_no_video'))
+        self.lblPlanDetails.setStyleSheet("font-size: 12px; font-weight: 600; color: #f4f4f6; line-height: 1.3;")
         self.lblPlanDetails.setWordWrap(True)
         plan_layout.addWidget(self.lblPlanDetails)
 
         self.lblPlanTip = QLabel("")
-        self.lblPlanTip.setStyleSheet("font-size: 12px; color: #38bdf8;")
+        self.lblPlanTip.setStyleSheet("font-size: 11px; color: #38bdf8;")
         self.lblPlanTip.setWordWrap(True)
         plan_layout.addWidget(self.lblPlanTip, 1)
 
         self.btnTestSample = QPushButton(self.t('btn_test_sample'))
         self.btnTestSample.setIcon(ui.icons.get_icon('flask', '#ffffff', 16))
-        self.btnTestSample.setStyleSheet("background-color: #0e7490; color: white; padding: 8px 14px;")
+        self.btnTestSample.setStyleSheet("background-color: #0e7490; color: white; padding: 7px 12px;")
         self.btnTestSample.setEnabled(False)
         self.btnTestSample.clicked.connect(self.create_sample_preview)
         plan_layout.addWidget(self.btnTestSample)
@@ -591,7 +618,7 @@ class CutGutApp(QMainWindow):
 
         # 6. Progress Bar & Status Line
         self.progBar = QProgressBar()
-        self.progBar.setFixedHeight(10)
+        self.progBar.setFixedHeight(8)
         main_layout.addWidget(self.progBar)
 
         self.statusLabel = QLabel(self.t('ready_status'))
@@ -772,21 +799,40 @@ class CutGutApp(QMainWindow):
     def retranslate_ui(self):
         self.setWindowTitle(self.t('title').format(version=__version__))
         self.btnHeaderOpen.setText(self.t('btn_change_file') if self.input_file else self.t('btn_open_file'))
+        
+        if not self.input_file:
+            self.lblCurrentFile.setText(self.t('no_video_selected'))
+        else:
+            w = self.video_info.width if self.video_info else 1920
+            h = self.video_info.height if self.video_info else 1080
+            self.lblCurrentFile.setText(f"{os.path.basename(self.input_file)} ({w}×{h} @ {self.video_fps:.0f} FPS)")
+
+        self.btnHelp.setToolTip(self.t('tooltip_help'))
+        self.btnSettings.setToolTip(self.t('tooltip_settings'))
+
         self.btnSetIn.setText(self.t('btn_set_in'))
         self.btnSetOut.setText(self.t('btn_set_out'))
         self.chkLoop.setText(self.t('chk_loop'))
         self.btnScreenshot.setText(self.t('btn_screenshot'))
+
+        self.lblExportTitle.setText(self.t('lbl_export_card'))
+        self.lblPlanTitle.setText(self.t('lbl_plan_card'))
+
         self.lblProf.setText(self.t('lbl_preset'))
         self.lblCrop.setText(self.t('lbl_crop'))
         self.lblLimit.setText(self.t('lbl_limit'))
         self.lblEnc.setText(self.t('lbl_encoder'))
+
         self.btnAlignLeft.setText(self.t('btn_align_left'))
         self.btnAlignCenter.setText(self.t('btn_align_center'))
         self.btnAlignRight.setText(self.t('btn_align_right'))
+
         self.btnCompress.setText(self.t('btn_compress'))
         self.btnAddToQueue.setText(self.t('btn_add_queue'))
         self.btnCancel.setText(self.t('btn_cancel'))
         self.btnTestSample.setText(self.t('btn_test_sample'))
+
+        self.queueDrawer.set_language(self.current_lang)
 
         self.update_range_text()
 
@@ -954,7 +1000,7 @@ class CutGutApp(QMainWindow):
     def update_live_estimate(self):
         if not self.input_file or not self.video_info:
             self.qualityBadge.set_assessment("No file loaded" if self.current_lang == 'en' else "Brak pliku", "#71717a")
-            self.lblPlanDetails.setText("Select a video to see export plan and quality." if self.current_lang == 'en' else "Wybierz film, aby zobaczyć plan i przewidywaną jakość.")
+            self.lblPlanDetails.setText(self.t('plan_no_video'))
             self.lblPlanTip.setText("")
             return
 
@@ -987,7 +1033,7 @@ class CutGutApp(QMainWindow):
 
         tip_text = f"<b>{q.description}</b>"
         if q.tip:
-            tip_text += f"<br><span style='color: #60cdff;'><b>Tip:</b> {q.tip}</span>"
+            tip_text += f"<br><span style='color: #60cdff;'><b>{'Wskazówka:' if self.current_lang == 'pl' else 'Tip:'}</b> {q.tip}</span>"
         self.lblPlanTip.setText(tip_text)
 
     def create_sample_preview(self):
@@ -1156,7 +1202,7 @@ class CutGutApp(QMainWindow):
             return
 
         self.queueDrawer.setVisible(True)
-        self.queueDrawer.lblHeader.setText(f"Job Queue ({len(self.queue)})" if self.current_lang == 'en' else f"Kolejka zadań ({len(self.queue)})")
+        self.queueDrawer.lblHeader.setText(self.t('queue_header').format(count=len(self.queue)))
         self.queueDrawer.table.setRowCount(len(self.queue))
 
         for row, job in enumerate(self.queue):
@@ -1168,14 +1214,14 @@ class CutGutApp(QMainWindow):
             self.queueDrawer.table.setItem(row, 4, QTableWidgetItem(job.preset_mode))
 
             st_text = job.status
-            if job.status == 'pending': st_text = 'Pending' if self.current_lang == 'en' else 'Oczekuje'
-            elif job.status == 'running': st_text = f'Encoding ({int(job.progress_pct)}%)'
-            elif job.status == 'finished': st_text = 'Done' if self.current_lang == 'en' else 'Gotowe'
-            elif job.status == 'error': st_text = 'Error' if self.current_lang == 'en' else 'Błąd'
-            elif job.status == 'cancelled': st_text = 'Cancelled' if self.current_lang == 'en' else 'Anulowano'
+            if job.status == 'pending': st_text = self.t('queue_status_pending')
+            elif job.status == 'running': st_text = self.t('queue_status_running').format(pct=int(job.progress_pct))
+            elif job.status == 'finished': st_text = self.t('queue_status_done')
+            elif job.status == 'error': st_text = self.t('queue_status_error')
+            elif job.status == 'cancelled': st_text = self.t('queue_status_cancelled')
             self.queueDrawer.table.setItem(row, 5, QTableWidgetItem(st_text))
 
-            act_text = 'A/B View' if job.status == 'finished' else ('Delete' if self.current_lang == 'en' else 'Usuń')
+            act_text = self.t('queue_action_ab') if job.status == 'finished' else self.t('queue_action_delete')
             item_act = QTableWidgetItem(act_text)
             item_act.setForeground(QColor('#60cdff' if job.status == 'finished' else '#ef4444'))
             self.queueDrawer.table.setItem(row, 6, item_act)
@@ -1185,7 +1231,7 @@ class CutGutApp(QMainWindow):
             return
         job = self.queue[row]
 
-        if 'A/B' in action_text and job.status == 'finished' and os.path.exists(job.output_path):
+        if ('A/B' in action_text or 'Widok' in action_text) and job.status == 'finished' and os.path.exists(job.output_path):
             dur_s = max(job.end_s - job.start_s, 0.1)
             try: info = encoder.probe_video(job.input_path)
             except Exception: info = None
