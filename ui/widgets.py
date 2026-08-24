@@ -3,10 +3,11 @@ import time
 from typing import Optional
 from PyQt6.QtWidgets import (
     QWidget, QFrame, QLabel, QHBoxLayout, QVBoxLayout,
-    QPushButton, QGraphicsOpacityEffect, QDialog
+    QPushButton, QDialog
 )
-from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRectF, QPointF, QPoint
-from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QFont
+from PyQt6.QtCore import Qt, QTimer, QRectF, QPointF, QPoint
+from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QFont, QIcon
+import ui.icons
 
 class FluentCard(QFrame):
     def __init__(self, parent=None):
@@ -36,8 +37,10 @@ class ToastNotification(QFrame):
         layout.setContentsMargins(12, 0, 12, 0)
         layout.setSpacing(8)
 
-        self.lblIcon = QLabel("ℹ️")
-        layout.addWidget(self.lblIcon)
+        self.btnIcon = QPushButton()
+        self.btnIcon.setStyleSheet("background: transparent; border: none; padding: 0;")
+        self.btnIcon.setFixedSize(20, 20)
+        layout.addWidget(self.btnIcon)
 
         self.lblText = QLabel("")
         layout.addWidget(self.lblText)
@@ -48,8 +51,15 @@ class ToastNotification(QFrame):
 
         self.hide()
 
-    def show_toast(self, text: str, icon: str = "ℹ️", duration_ms: int = 3500):
-        self.lblIcon.setText(icon)
+    def show_toast(self, text: str, icon_name: str = "info", duration_ms: int = 3500):
+        color = '#38bdf8'
+        if icon_name == 'check':
+            color = '#10b981'
+        elif icon_name in ('cancel', 'cross'):
+            color = '#ef4444'
+            icon_name = 'cancel'
+
+        self.btnIcon.setIcon(ui.icons.get_icon(icon_name, color, 18))
         self.lblText.setText(text)
         self.adjustSize()
 
@@ -64,13 +74,12 @@ class ToastNotification(QFrame):
     def hide_toast(self):
         self.hide()
 
-
 class QualityBadge(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedHeight(28)
-        self.setFixedWidth(150)
-        self.label_text = "Oczekiwanie na film"
+        self.setFixedWidth(160)
+        self.label_text = "No File Loaded"
         self.dot_color = QColor("#71717a")
 
     def set_assessment(self, label: str, color_hex: str):
@@ -84,17 +93,17 @@ class QualityBadge(QFrame):
 
         rect = QRectF(0.5, 0.5, self.width() - 1, self.height() - 1)
 
-        # 1. Tło pigułki
+        # 1. Background Pill
         painter.setPen(QPen(QColor(255, 255, 255, 18), 1))
         painter.setBrush(QBrush(QColor(30, 30, 36)))
         painter.drawRoundedRect(rect, 14, 14)
 
-        # 2. Świecący punkt statusu
+        # 2. Glowing Status Dot
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QBrush(self.dot_color))
         painter.drawEllipse(QPointF(14.0, self.height() / 2.0), 4.5, 4.5)
 
-        # 3. Tekst oceny
+        # 3. Assessment Text
         painter.setPen(QColor("#f4f4f6"))
         font = QFont("Segoe UI Variable", 9, QFont.Weight.Bold)
         painter.setFont(font)

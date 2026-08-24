@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
+import ui.icons
 
 class QueueDrawerWidget(QFrame):
     job_action_clicked = pyqtSignal(int, str)  # emits (row, action_name)
@@ -25,7 +26,7 @@ class QueueDrawerWidget(QFrame):
         layout.setSpacing(8)
 
         hdr_row = QHBoxLayout()
-        self.lblHeader = QLabel("📋 Kolejka zadań (0)")
+        self.lblHeader = QLabel("Kolejka zadań (0)" if lang == 'pl' else "Job Queue (0)")
         self.lblHeader.setStyleSheet("font-weight: 700; font-size: 13px; color: #60cdff;")
         hdr_row.addWidget(self.lblHeader)
 

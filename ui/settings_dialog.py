@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 import encoder
 import update_service
+import ui.icons
 
 class FluentSettingsDialog(QDialog):
     def __init__(
@@ -22,7 +23,7 @@ class FluentSettingsDialog(QDialog):
         include_prerelease: bool,
         current_theme: str = "dark",
         reduce_animations: bool = False,
-        version_str: str = "202608240-6-0"
+        version_str: str = "202608240-6-5"
     ):
         super().__init__(parent)
         self.current_lang = current_lang
@@ -68,7 +69,7 @@ class FluentSettingsDialog(QDialog):
         layout.setSpacing(12)
 
         # 1. FOLDER WYNIKOWY
-        lbl_out_hdr = QLabel(f"<b>{self.t('📁 FOLDER WYNIKOWY', '📁 OUTPUT DIRECTORY')}</b>")
+        lbl_out_hdr = QLabel(f"<b>{self.t('Folder wynikowy', 'Output Directory')}</b>")
         lbl_out_hdr.setStyleSheet("color: #60cdff; font-size: 13px;")
         layout.addWidget(lbl_out_hdr)
 
@@ -85,6 +86,7 @@ class FluentSettingsDialog(QDialog):
         dir_row.addWidget(self.lblDirPath, 1)
 
         self.btnBrowseDir = QPushButton(self.t("Wybierz...", "Choose..."))
+        self.btnBrowseDir.setIcon(ui.icons.get_icon('folder', '#f4f4f6', 16))
         self.btnBrowseDir.clicked.connect(self.browse_output_dir)
         dir_row.addWidget(self.btnBrowseDir)
         dir_layout.addLayout(dir_row)
@@ -103,7 +105,7 @@ class FluentSettingsDialog(QDialog):
         layout.addWidget(dir_card)
 
         # 2. PO UDANYM EKSPORCIE
-        lbl_clean_hdr = QLabel(f"<b>{self.t('🛡️ PO UDANYM EKSPORCIE', '🛡️ AFTER SUCCESSFUL EXPORT')}</b>")
+        lbl_clean_hdr = QLabel(f"<b>{self.t('Zarządzanie oryginałem po eksporcie', 'Original File Handling')}</b>")
         lbl_clean_hdr.setStyleSheet("color: #60cdff; font-size: 13px;")
         layout.addWidget(lbl_clean_hdr)
 
@@ -117,7 +119,7 @@ class FluentSettingsDialog(QDialog):
         self.rb_never = QRadioButton(self.t("Zachowaj oryginał (Zalecane)", "Keep original file (Recommended)"))
         self.rb_ask = QRadioButton(self.t("Zapytaj, co zrobić z oryginałem", "Ask what to do with original"))
         self.rb_trash = QRadioButton(self.t("Przenieś oryginał do Kosza automatycznie", "Move original to Recycle Bin automatically"))
-        self.rb_delete = QRadioButton(self.t("Usuń oryginał na stałe automatycznie (⚠ Nieodwracalne)", "Delete original permanently automatically (⚠ Irreversible)"))
+        self.rb_delete = QRadioButton(self.t("Usuń oryginał na stałe automatycznie (Nieodwracalne)", "Delete original permanently automatically (Irreversible)"))
 
         self.btn_group.addButton(self.rb_never, 0)
         self.btn_group.addButton(self.rb_ask, 1)
@@ -137,7 +139,7 @@ class FluentSettingsDialog(QDialog):
         layout.addWidget(clean_card)
 
         # 3. DODATKOWE & WYGLĄD
-        lbl_extra_hdr = QLabel(f"<b>{self.t('⚙️ DODATKOWE & WYGLĄD', '⚙️ OPTIONS & THEME')}</b>")
+        lbl_extra_hdr = QLabel(f"<b>{self.t('Opcje i aktualizacje', 'Options & Updates')}</b>")
         lbl_extra_hdr.setStyleSheet("color: #60cdff; font-size: 13px;")
         layout.addWidget(lbl_extra_hdr)
 
@@ -201,7 +203,7 @@ class FluentSettingsDialog(QDialog):
         elif checked_id == 3:
             res = QMessageBox.warning(
                 self, self.t("Ostrzeżenie", "Warning"),
-                self.t("Uwaga: Ta opcja będzie trwale usuwać pliki z dysku.\\nCzy na pewno włączyć?", "Warning: This permanently deletes files.\\nAre you sure?"),
+                self.t("Uwaga: Ta opcja będzie trwale usuwać pliki z dysku.\nCzy na pewno włączyć?", "Warning: This permanently deletes files.\nAre you sure?"),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No
             )

@@ -223,7 +223,7 @@ class VideoCanvasWidget(QWidget):
 
             # Plakietka wymiarów kadru na górze ramki
             cb = self.get_crop_box()
-            tag_text = f"📱 {cb.ratio_type} ({cb.w}×{cb.h})" if cb.ratio_type == "9:16" else f"📐 {cb.ratio_type} ({cb.w}×{cb.h})"
+            tag_text = f"{cb.ratio_type} ({cb.w}×{cb.h})"
             badge_w = 144
             badge_h = 24
             badge_x = crop_rect.center().x() - badge_w / 2.0
