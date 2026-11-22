@@ -1,6 +1,6 @@
 [package]
 name = "cutgut-gui"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "Native Windows editor for cutting gameplay clips to a size limit"
 license = "MIT"

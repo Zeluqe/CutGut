@@ -149,6 +149,8 @@ Pełny opis, razem z pomiarami VMAF dla AV1/HEVC/H.264 i uzasadnieniem 4% zapasu
 - Interfejs i dokumentacja są po angielsku i polsku; domyślnie włącza się angielski.
 - Pierwsze skanowanie dużej galerii trochę trwa, bo każda miniatura jest generowana. Kolejne
   uruchomienia korzystają z cache miniatur w `temp\gallery_cache` obok pliku exe.
+- Plik exe ma około 57 MB, bo w środku siedzą tła i 26 pętli animowanych. Działają offline;
+  pętle są w 960x540 i są rysowane pod przyciemnieniem.
 - AV1 na CPU jest wolne. Przy ciasnym limicie daje najlepszy wynik, ale dwuminutowy klip może
   kodować się kilka minut.
 

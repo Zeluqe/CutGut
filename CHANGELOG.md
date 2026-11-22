@@ -5,11 +5,22 @@ with the native Rust version.
 
 ## How versions are named
 
-Releases use `vMAJOR.MINOR.PATCH-YYYY.MM.DD` (this release is `v0.2.0-2026.11.22`). The app shows
+Releases use `vMAJOR.MINOR.PATCH-YYYY.MM.DD` (this release is `v0.2.1-2026.11.22`). The app shows
 the short `MAJOR.MINOR.PATCH` part, and the date is the day the build was made. Every entry
 below is grouped by what actually changed: **New features**, **Fixes**, **GUI**, **Docs** and
 **Internal**. A release that only fixes bugs still gets a patch bump; a new feature or a
 visible GUI change bumps the minor version.
+
+## 0.2.1 — 2026-11-22
+
+### Internal
+
+- Re-encoded the 26 animated background loops from 1920x1080 to 960x540 (VP9, CRF 36). They
+  are still embedded, so animated backgrounds work offline, but the motion assets went from
+  136 MB to 12 MB and the release executable from 189 MB to about 57 MB. The UI already draws
+  the loops at 960x540 behind the background veil, so the visible result is the same.
+- Built-in motion now uses the same 960x540 path as custom backgrounds, which also cuts the
+  per-frame upload to the UI.
 
 ## 0.2.0 — 2026-11-22
 

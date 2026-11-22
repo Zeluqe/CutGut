@@ -537,11 +537,11 @@ checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
 name = "cutgut"
-version = "0.2.0"
+version = "0.2.1"
 
 [[package]]
 name = "cutgut-gui"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "chrono",
  "cutgut",

@@ -146,6 +146,8 @@ behind the 4% safety margin, is in
 - The interface and documentation are available in English and Polish; English is the default.
 - The first scan of a large gallery takes a while because every thumbnail is generated. Later
   runs use the thumbnail cache in `temp\gallery_cache` next to the executable.
+- The executable is about 57 MB because the still backgrounds and 26 animated loops are
+  embedded. They work offline; the loops are 960x540 and are drawn behind a veil.
 - AV1 on CPU is slow. It is the best option for a tight size limit, but a two-minute clip can
   take a few minutes to encode.
 

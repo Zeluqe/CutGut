@@ -13,11 +13,11 @@ use crate::process::Process;
 
 const WIDTH: usize = 960;
 const HEIGHT: usize = 540;
-/// Built-in loops used to be uploaded as full 1920x1080 RGBA frames (8.3 MB per
-/// frame into the UI thread). 720p cuts the per-frame transfer by more than half
-/// and is indistinguishable behind the background veil.
-const FULL_WIDTH: usize = 1280;
-const FULL_HEIGHT: usize = 720;
+/// Built-in loops are encoded at 960x540. They used to ship at 1920x1080, which
+/// cost 8.3 MB per RGBA frame and 136 MB of embedded assets; 540p is
+/// indistinguishable behind the background veil and keeps the executable small.
+const FULL_WIDTH: usize = WIDTH;
+const FULL_HEIGHT: usize = HEIGHT;
 const FIT: &str = "scale=960:540:force_original_aspect_ratio=increase,crop=960:540,setsar=1";
 const CUSTOM_FPS: u32 = 30;
 const FRAME_BUFFER: usize = 8;
@@ -113,13 +113,7 @@ impl MotionBackground {
     }
 
     pub fn start_built_in(ctx: &egui::Context, path: &Path) -> Self {
-        Self::start_filtered(
-            ctx,
-            path,
-            [FULL_WIDTH, FULL_HEIGHT],
-            Some(&format!("scale={FULL_WIDTH}:{FULL_HEIGHT},setsar=1")),
-            24,
-        )
+        Self::start_filtered(ctx, path, [FULL_WIDTH, FULL_HEIGHT], Some(FIT), 24)
     }
 
     fn start_filtered(
