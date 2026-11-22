@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    # Tags are what create a release below. Without the tag trigger the
+    # release job would never run.
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  windows:
+    # The app is Windows-only (winmm, OLE drag-out, %APPDATA%), so the tests
+    # run where the product runs.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Formatting
+        run: |
+          cargo fmt --manifest-path cutgut-rs/Cargo.toml -- --check
+          cargo fmt --manifest-path cutgut-gui/Cargo.toml -- --check
+
+      # The export tests shell out to ffmpeg for real: a cut that drifts or a
+      # file that overshoots its size limit fails here, not in a user's export.
+      - name: FFmpeg
+        run: choco install ffmpeg -y --no-progress
+
+      - name: Engine tests
+        run: cargo test --manifest-path cutgut-rs/Cargo.toml
+
+      - name: App tests
+        run: cargo test --manifest-path cutgut-gui/Cargo.toml
+
+      # Informational for now: the tree still carries a few warnings, so they
+      # are printed without -D warnings. A real clippy error still fails here.
+      - name: Clippy
+        run: cargo clippy --manifest-path cutgut-gui/Cargo.toml --all-targets
+
+      - name: Release build
+        run: |
+          cargo build --release --manifest-path cutgut-rs/Cargo.toml
+          cargo build --release --manifest-path cutgut-gui/Cargo.toml
+
+      - name: Upload app
+        uses: actions/upload-artifact@v4
+        with:
+          name: CutGut-windows
+          path: |
+            cutgut-gui/target/release/cutgut-gui.exe
+            cutgut-rs/target/release/cutgut.exe
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: windows
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build
+        run: |
+          cargo build --release --manifest-path cutgut-rs/Cargo.toml
+          cargo build --release --manifest-path cutgut-gui/Cargo.toml
+          copy cutgut-gui\target\release\cutgut-gui.exe CutGut.exe
+          copy cutgut-rs\target\release\cutgut.exe cutgut.exe
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            CutGut.exe
+            cutgut.exe
+          generate_release_notes: true
