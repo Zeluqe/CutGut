@@ -1,0 +1,18 @@
+[package]
+name = "cutgut"
+version = "0.1.0"
+edition = "2021"
+description = "CutGut engine: media probing, byte-budget planning and FFmpeg encoding"
+license = "MIT"
+repository = "https://github.com/Zeluqe/CutGut"
+
+[[bin]]
+name = "cutgut"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

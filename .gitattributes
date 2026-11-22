@@ -1,0 +1,21 @@
+# Keep text as text and binaries as binaries. The .bat launcher is the only
+# file that needs CRLF on Windows; everything else stays LF in the repo.
+* text=auto
+
+*.bat text eol=crlf
+*.md text
+*.rs text
+*.toml text
+*.yml text
+
+*.exe binary
+*.dll binary
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webm binary
+*.ttf binary
+*.zip binary
+
+Cargo.lock text

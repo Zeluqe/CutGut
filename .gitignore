@@ -1,0 +1,34 @@
+# Runtime output: exported clips, thumbnails, cached filmstrips
+outputs/
+temp/
+*.log
+*.mbtree
+*.cutree
+stats_*
+ffmpeg2pass*
+
+# Local builds and archives (releases are published from CI)
+*.exe
+*.dll
+*.pdb
+*.zip
+backup/
+
+# Rust build output
+cutgut-rs/target/
+cutgut-gui/target/
+cutgut-gui/shot*.png
+
+# Local configuration and anything private used while testing the UI
+.env
+.env.*
+*.pem
+*.key
+docs/private/
+
+# IDE / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
