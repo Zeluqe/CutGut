@@ -82,12 +82,14 @@ jobs:
           cargo build --release --manifest-path cutgut-rs/Cargo.toml
           cargo build --release --manifest-path cutgut-gui/Cargo.toml
           copy cutgut-gui\target\release\cutgut-gui.exe CutGut.exe
-          copy cutgut-rs\target\release\cutgut.exe cutgut.exe
+          # Package the CLI instead of dropping cutgut.exe next to CutGut.exe:
+          # Windows filenames are case-insensitive, so the two would collide.
+          Compress-Archive -Path cutgut-rs\target\release\cutgut.exe -DestinationPath cutgut-cli.zip -Force
 
       - name: Publish
         uses: softprops/action-gh-release@v2
         with:
           files: |
             CutGut.exe
-            cutgut.exe
+            cutgut-cli.zip
           generate_release_notes: true
