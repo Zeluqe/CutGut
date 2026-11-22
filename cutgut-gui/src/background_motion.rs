@@ -316,7 +316,8 @@ mod tests {
                 assert_eq!(frame.size, [WIDTH, HEIGHT]);
             }
             drop(playback);
-            std::fs::remove_file(local).unwrap();
+            // The decoder may still hold the file open on Windows; the temp
+            // directory cleans it up when the test ends.
         }
     }
 }
