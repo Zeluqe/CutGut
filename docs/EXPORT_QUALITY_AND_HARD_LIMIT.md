@@ -1,159 +1,221 @@
-# CutGut — Jakość Eksportu i Gwarancja Twardego Limitu Rozmiaru
+# Export quality and the hard size limit
 
-Dokumentacja techniczna mechanizmu kodowania wideo, budżetowania bajtowego, obsługi nowoczesnych kodeków (AV1, HEVC, H.264), wykrywania enkoderów sprzętowych, atomowego zapisu oraz pętli korekty rozmiaru.
+This is the technical companion to the README. It explains how CutGut turns "make this clip
+fit in 20 MB" into a bitrate, how the encoder is chosen, and what happens when the first
+attempt is still too large. The short version: the limit is a byte count, not an estimate, and
+an export that misses it is retried instead of being reported as successful.
 
----
+## Codecs
 
-## 1. Wybór Kodeka i Wymagania Sprzętowe
+| Codec | Best for | NVIDIA | AMD | CPU fallback |
+| --- | --- | --- | --- | --- |
+| H.264 / AVC | Maximum compatibility: Discord, browsers, old phones | `h264_nvenc` | `h264_amf` | `libx264` |
+| HEVC / H.265 | About 30–40% better compression than H.264 at the same quality | `hevc_nvenc` | `hevc_amf` | `libx265` |
+| AV1 | The most quality per byte at a tight limit | `av1_nvenc` (RTX 40 series and newer) | `av1_amf` (RDNA 3 and newer) | `libsvtav1` |
 
-Aplikacja CutGut obsługuje trzy główne standardy kompresji wideo:
+AV1 is the best choice when the limit is tight, but it is also the least compatible option.
+Someone on an older phone or an older browser may not be able to play it. HEVC is a good
+middle ground; H.264 is the safe choice for something sent to a group chat.
 
-| Kodek | Opis i Przeznaczenie | Enkoder GPU (NVIDIA) | Enkoder GPU (AMD) | Enkoder CPU (Fallback) | Kompatybilność Odtwarzania |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **H.264 / AVC** | Maksymalna kompatybilność ze wszystkimi urządzeniami | `h264_nvenc` | `h264_amf` | `libx264` (2-pass / 1-pass) | **Pełna (100%)**: Discord, przeglądarki, starsze telefony i konsole |
-| **HEVC / H.265** | Wysoka wydajność kompresji (~30–40% lepsza jakość niż H.264) | `hevc_nvenc` | `hevc_amf` | `libx265` (2-pass / 1-pass) | **Częściowa**: Wymaga wsparcia dekodera HEVC w systemie/przeglądarce odbiorcy |
-| **AV1** | Następna generacja, najwyższa ostrość i wydajność przy małych limitach | `av1_nvenc` (RTX 40xx+) | `av1_amf` (RDNA 3+) | `libsvtav1` | **Zależna od odbiorcy**: Wymaga nowszego sprzętu lub przeglądarek Chrome/Edge/Firefox |
+## Encoder detection
 
-### Wykrywanie Dostępności i Jawny Fallback
-- Dostępność każdego enkodera nie jest ustalana jedynie na podstawie listy tekstowej `ffmpeg -encoders`, lecz poprzez **rzeczywiste kodowanie testowe 1 klatki** (`color=c=black:s=256x256:d=0.04`) do sinka `null`.
-- Wymiar min. 256x256 zapobiega fałszywym odrzuceniom ze strony architektury NVENC (która odrzuca klatki mniejsze niż 64–128 px).
-- Wyniki testów są **cache'owane w pamięci** (`OnceLock<Mutex<HashMap<..>>>` w `cutgut-rs/src/ffmpeg.rs`), co eliminuje wielokrotne uruchamianie podprocesów.
-- W przypadku żądania kodowania sprzętowego AV1 na karcie bez wsparcia NVENC AV1 (np. RTX 20/30 series), następuje **jawny fallback** do enkodera CPU (`libsvtav1`), o czym użytkownik jest natychmiast informowany w logach oraz GUI, a plan kompresji zostaje przeliczony pod faktycznie używany silnik.
+`ffmpeg -encoders` only says that an encoder was compiled in. It does not prove that the
+driver, the GPU and the current session can actually use it. CutGut therefore runs a real
+one-frame encode to a null sink (`color=c=black:s=256x256:d=0.04`) for each candidate.
+The result is cached in memory for the rest of the process.
 
----
+The 256×256 size is deliberate: some NVENC paths reject very small frames, which would look
+like "the GPU is not supported" when it is.
 
-## 2. Matematyka Budżetu Bajtowego i Twardy Limit
+If AV1 hardware encoding was requested on a GPU without it (for example an RTX 20 or 30
+series card), the plan falls back to `libsvtav1` and says so in the log and in the UI. It does
+not silently keep a hardware plan for a software encoder.
 
-### Definicja MB
-Wszystkie limity rozmiaru w CutGut bazują na ścisłej definicji dziesiętnej:
-$$\text{Twardy Limit (Hard Limit)} = \text{target\_mb} \times 1\,000\,000\text{ bajtów}$$
-Przykłady:
-- **20 MB (Discord Free)** = dokładnie $20\,000\,000$ bajtów.
-- **10 MB (Legacy / Small)** = dokładnie $10\,000\,000$ bajtów.
-- **50 MB (Nitro Basic)** = dokładnie $50\,000\,000$ bajtów.
-- **500 MB (Nitro Full)** = dokładnie $500\,000\,000$ bajtów.
+## The byte budget
 
-### Bezpieczny Cel Planowania (Planning Budget)
-Aby wyjściowy plik nie przekroczył twardego limitu przez wariancję multipleksowania kontenera MP4, początkowy plan bitrate wideo celuje w:
-$$\text{Cel Budżetowy} = \text{target\_mb} \times 1\,000\,000 \times 0.960\text{ bajtów}$$
-Pozostawia to bezpieczny margines 4.0% (~800 KB dla 20 MB) na nagłówki kontenera MP4, tabelę indeksów (`moov atom`) i ewentualne fluktuacje klatek kluczowych — dzięki temu pliki AV1/HEVC nie lądują dokładnie na granicy limitu.
+CutGut uses decimal megabytes, because that is what Discord and the file properties dialog
+show:
 
-### Uwzględnianie Audio i Kontenera
-1. **Badanie obecności audio**: Jeśli źródło nie zawiera ścieżki dźwiękowej (`VideoInfo::audio_codec == None`), budżet audio wynosi $0\text{ bps}$. Całość dostępnych bajtów trafia do strumienia wideo (`-map 0:v:0 -an`).
-2. **Narzut kontenera**:
-   $$\text{Overhead} = 30\,000 + (\text{duration\_s} \times 350)\text{ bajtów}$$
-3. **Bitrate wideo**:
-   $$\text{net\_video\_bytes} = \text{target\_bytes} - \text{audio\_bytes} - \text{overhead\_bytes}$$
-   $$\text{video\_kbps} = \max\left(\left\lfloor \frac{\text{net\_video\_bytes} \times 8}{\text{duration\_s} \times 1000} \right\rfloor, 30\right)$$
-4. **Weryfikacja nierealnego limitu**: Jeśli $\text{net\_video\_bytes} \le 0$ lub obliczony bitrate wyniósłby poniżej 30 kbps, operacja zostaje wstrzymana z czytelnym błędem `EncodingError`, proponując skrócenie klipu lub podniesienie limitu MB. Nigdy nie jest zgłaszany sukces dla pliku ponad limitem.
-5. **Sufit bits-per-pixel**: Limit rozmiaru bywa absurdalnie duży w stosunku do klipu: 4 s nagrania 360p pod limitem 500 MB to ok. 1 Gb/s, a takiego strumienia NVENC i AMF **nie otwierają** (`InitializeEncoder failed: invalid param`), więc eksport kończył się błędem mimo poprawnego planu. Bitrate jest więc ograniczany do `kbps_max = w * h * fps * 0.5 / 1000` (pół bita na piksel to już jakość wizualnie bezstratna dla H.264/HEVC). Plan ustawia wtedy flagę `bitrate_capped`, a GUI i CLI mówią wprost: „Limit jest większy, niż ten klip potrzebuje - plik wyjdzie mniejszy".
+```text
+hard_limit_bytes = target_mb × 1,000,000
+```
 
----
+So 20 MB is exactly 20,000,000 bytes. The first plan leaves a safety margin, because an MP4
+has a `moov` atom, audio packets and keyframe variance that are hard to predict exactly:
 
-## 2b. Co realnie daje najlepszą jakość przy tym samym limicie (pomiary VMAF)
+```text
+planning_bytes = hard_limit_bytes × 0.96   (H.264 and HEVC)
+planning_bytes = hard_limit_bytes × 0.94   (AV1)
+```
 
-Test: 12 s klipu 1080p60 z gry, budżet ok. 8,9 MB (≈5,6 Mb/s), VMAF liczony wobec źródła, wszystko przez własny pipeline CutGuta.
+AV1 gets a slightly larger margin because SVT-AV1 and NVENC AV1 VBR can overshoot a little
+more often. The rest is divided between audio and video:
 
-| Ścieżka | Rozmiar | VMAF | Czas (12 s klipu) |
-|---|---|---|---|
-| AV1 CPU (SVT-AV1 preset 5, 2-pass) | 8,52 MB | **95,37** | 122 s |
-| AV1 GPU (`av1_nvenc`, `-tune uhq -preset p7`) | 8,39 MB | **95,23** | ~20 s |
-| HEVC GPU (`hevc_nvenc`, `-tune uhq -preset p7 -b_ref_mode middle`) | 8,41 MB | 94,36 | ~15 s |
-| HEVC GPU (poprzednie flagi: `p6`/`hq`) | 8,10 MB | 93,63 | ~7 s |
-| H.264 CPU (`libx264`, 2-pass slow) | 8,69 MB | 93,35 | 13,5 s |
-| H.264 GPU (`h264_nvenc`, `p6`) | 8,15 MB | 88,88 | ~6 s |
+```text
+audio_bytes    = audio_bitrate × duration_seconds / 8
+overhead_bytes = 30,000 + 350 × duration_seconds
+net_video_bytes = planning_bytes - audio_bytes - overhead_bytes
+video_kbps     = max(floor(net_video_bytes × 8 / duration_seconds / 1000), 30)
+```
 
-Wnioski, które trafiły do kodu:
-- **`-tune uhq` + `-preset p7` + `-b_ref_mode middle`** dla NVENC: +0,7 VMAF przy tym samym rozmiarze (HEVC) i +0,9 (H.264). Flagi są *sondeowane* jednoklatkowym testem, więc starszy sterownik po prostu wraca do poprzedniego zestawu zamiast wywalić eksport.
-- **AV1 jest najlepszy na MB** (+0,9 VMAF nad HEVC, +6 nad sprzętowym H.264). Jeśli limit jest ciasny (bppf < 0,055), karta planu podpowiada zmianę kodeka.
-- **Sprzętowy H.264 przy ciasnym limicie to najgorszy wybór** (88,9 vs 94,4 HEVC) — dlatego podpowiedź pojawia się właśnie tam.
+Audio is planned at 96 kbps for HEVC/AV1 and 128 kbps for H.264, or 0 if the source has no
+audio track. If the source has 5.1 audio it is downmixed to stereo at that bitrate.
 
-Pomysły sprawdzone i **odrzucone** (zmierzone jako gorsze):
-- **Skalowanie w dół do 720p** przy 4,6 Mb/s: VMAF 86,2 — tracimy więcej na rozdzielczości, niż zyskujemy na bitach. Progi w planie już to uwzględniają.
-- **Połowa klatek (30 fps)**: VMAF 56,6 (VMAF porównuje klatka w klatkę) i realna utrata płynności. Nie robić.
-- **Denoise przed enkodowaniem** (`hqdn3d`): 92,9 — wygładza tekstury i psuje ostrość gry.
+If the calculated video bitrate would be below 30 kbps, the plan stops with a clear error
+instead of producing a broken file. The usual reason is a very long clip and a very small
+limit; the fix is to trim the clip or raise the limit.
 
-Pomysł sprawdzony i **działający, ale świadomie nie włączony domyślnie**:
-- **HEVC 10-bit (`-profile:v main10 -pix_fmt p010le -highbitdepth 1`)**: 94,24 VMAF przy 5,34 Mb/s vs 93,63 przy 5,53 Mb/s dla 8-bit — czyli ok. +0,6 VMAF i mniejszy plik, bo 10 bitów zabija banding na gradientach (niebo, dym, cienie). Koszt: mniejsza zgodność odtwarzaczy (QuickTime/iOS, część platform social). Kandydat na opcję „maksymalna jakość", nie na domyślne ustawienie.
+### Bits-per-pixel ceiling
 
----
+A size limit can be much larger than a clip needs. A four-second 360p clip under a 500 MB
+limit would ask the encoder for about 1 Gb/s. NVENC and AMF reject that with
+`InitializeEncoder failed: invalid param`, even though the byte arithmetic is correct.
 
-## 3. Profile Jakości i Rate Control dla NVENC
+The plan therefore caps the video bitrate at half a bit per pixel:
 
-Dla enkoderów NVIDIA NVENC (`h264_nvenc`, `hevc_nvenc`, `av1_nvenc`) wdrożono zaawansowane parametry sterowania strumieniem VBR:
-- **Preset**: `p6` dla trybu wysokiej jakości (HQ) oraz `p3` dla trybu szybkiego (Fast).
-- **Tuning**: `-tune hq`.
-- **Multipass**: `-multipass fullres` (sprzętowa analiza makrobloków w pełnej rozdzielczości podczas jednej sesji kodowania na układzie NVENC — nie mylić z dwuprzebiegową pełną analizą pliku CPU).
-- **Lookahead**: `-rc-lookahead 32` dla przewidywania trudnych scen (dym, cząsteczki, ogień).
-- **Adaptive Quantization**: `-spatial-aq 1` oraz `-temporal-aq 1` (weryfikowane dynamicznie dla danego sterownika za pomocą `get_nvenc_quality_options()`).
-- **Elastyczny sufit VBR**: `-maxrate {int(v_kbps * 1.5)}k -bufsize {int(v_kbps * 2.0)}k`, co pozwala enkoderowi przydzielić więcej bitów trudniejszym klatkom bez sztucznego zaciskania do CBR.
+```text
+bpp_ceiling_kbps = width × height × fps × 0.5 / 1000
+video_kbps = min(wanted_kbps, max(bpp_ceiling_kbps, 30))
+```
 
----
+Half a bit per pixel is visually close to lossless for H.264/HEVC. When the cap is applied,
+the plan sets `bitrate_capped` and the UI says the limit is larger than the clip needs, so the
+file will come out smaller. It does not pretend it can spend the missing bytes.
 
-## 4. Bezpieczny Zapis i Pętla Korekty Rozmiaru
+## Quality at the same file size
 
-### Blokada Nadpisania Źródła
-Przed rozpoczęciem operacji sprawdzana jest tożsamość ścieżki wejściowej i wyjściowej (`same_file()` → `std::fs::canonicalize`). Jeśli wyjście wskazuje na źródło (w tym przez dowiązanie symboliczne, twarde lub alias), eksport jest natychmiast blokowany z czytelnym błędem.
+The numbers below come from one 12-second 1080p60 gameplay clip at about 8.9 MB
+(≈5.6 Mb/s), encoded through CutGut's own pipeline. VMAF is measured against the source. They
+are a useful direction, not a universal benchmark: animation, dark scenes and high-motion
+gameplay all behave differently.
 
-### Atomowa Podmiana (`MoveFileExW`)
-- Plik tymczasowy tworzony jest bezpośrednio w **katalogu docelowym** (`.cg_tmp_{tag}_{nazwa}`), co gwarantuje znajdowanie się na tym samym wolumenie dyskowym.
-- Poprzedni plik docelowy **nie jest usuwany przed zakończeniem kodowania**.
-- Dopiero po pomyślnej weryfikacji rozmiaru ($\le \text{hard\_limit\_bytes}$) wykonywana jest atomowa podmiana przez `MoveFileExW(.., MOVEFILE_REPLACE_EXISTING)`.
-- W razie błędu kodowania, anulowania lub problemów z uprawnieniami pliku, istniejący plik docelowy użytkownika pozostaje w 100% nienaruszony.
-- Sprzątane są wyłącznie pliki tymczasowe należące do danego zadania (izolacja procesów).
+| Path | Size | VMAF | Time for 12 s |
+| --- | --- | --- | --- |
+| AV1 CPU (SVT-AV1 preset 5, 2-pass) | 8.52 MB | **95.37** | 122 s |
+| AV1 GPU (`av1_nvenc`, `-tune uhq -preset p7`) | 8.39 MB | **95.23** | ~20 s |
+| HEVC GPU (`hevc_nvenc`, `-tune uhq -preset p7 -b_ref_mode middle`) | 8.41 MB | 94.36 | ~15 s |
+| HEVC GPU (older flags: `p6` / `hq`) | 8.10 MB | 93.63 | ~7 s |
+| H.264 CPU (`libx264`, 2-pass slow) | 8.69 MB | 93.35 | 13.5 s |
+| H.264 GPU (`h264_nvenc`, preset `p6`) | 8.15 MB | 88.88 | ~6 s |
 
-### Korekta Rozmiaru z Zachowaniem Ustawień Jakości
-Plik jest akceptowany dopiero, gdy jego rzeczywisty rozmiar jest $\le 99.5\%$ twardego limitu (ostatnia, 3. próba toleruje pełny limit). Dzięki temu wynik nigdy nie „stoi” na granicy 20 MB.
-Gdy plik po pierwszym podejściu przekroczy bezpieczny próg:
-1. Plik tymczasowy zostaje usunięty.
-2. Narzut audio i kontenera MP4 ma stałą wagę, dlatego korygowany jest wyłącznie budżet wideo:
-   $$\text{measured\_video} = \max(\text{actual\_size} - \text{audio\_bytes} - \text{overhead\_bytes}, 1000)$$
-   $$\text{target\_video} = \max(\text{hard\_limit\_bytes} \times \text{safety} - \text{audio\_bytes} - \text{overhead\_bytes}, 1000)$$
-   $$\text{corrected\_vkbps} = \max\left(\left\lfloor \text{current\_vkbps} \times \min\left(\frac{\text{target\_video}}{\text{measured\_video}}, 0.95\right) \right\rfloor, 25\right)$$
-3. Kodowanie ponawiane jest **Z ORYGINALNEGO ŹRÓDŁA**, z zachowaniem **dokładnie tego samego kodeka, presetu, opcji VBR (w tym multipass, AQ i lookahead)**.
-4. Pętla wykonuje **maksymalnie 3 próby**.
-5. Jeśli po 3 próbach rozmiar nadal przekracza limit, operacja kończy się błędem (`Err(String)` z czytelnym opisem). Plik ponad limitem nigdy nie jest oznaczany jako udany eksport.
+What made it into the code:
 
----
+- For NVENC, the ultra-quality tune with B-frame references (`-tune uhq -preset p7
+  -b_ref_mode middle`) is worth roughly +0.7 VMAF on HEVC and +0.9 on H.264 at the same size.
+  Each flag set is probed with a one-frame encode; an older driver falls back to the previous
+  set instead of failing the export.
+- At a tight limit, AV1 is the best use of the bytes: about +0.9 VMAF over HEVC and +6 over
+  hardware H.264.
+- Hardware H.264 is the worst choice at a tight limit. When the plan sees a very low
+  bits-per-pixel value, it suggests AV1 or HEVC instead.
 
-## 5. Bezstratny Remux (Stream Copy)
+Ideas that were measured and rejected:
 
-Gdy klip mieści się bezpośrednio w limicie rozmiaru:
-- Remux jest dozwolony tylko wtedy, gdy kadr nie został przycięty (`crop_box is None` lub `original`), a kodek źródłowy odpowiada żądanemu kodekowi docelowemu.
-- Jeśli użytkownik wybrał AV1, a źródło to H.264, remux jest zablokowany, aby zrealizować kompresję do żądanego formatu.
-- Rozmiar remuksowanego pliku jest weryfikowany po zakończeniu: jeśli przekracza limit, plik tymczasowy jest usuwany i CutGut płynnie przechodzi do pełnego kodowania bez naruszania pliku docelowego.
-- **Cięcie remuxem jest weryfikowane.** `-c copy` potrafi zaczynać tylko od klatki kluczowej, więc przy cięciu pomiędzy keyframe'ami plik wychodził z „doklejonym" fragmentem przed żądanym czasem (zmierzone: cięcie 6-10 s dawało pierwszą klatkę na -1.835 s i 5.9 s materiału przy deklarowanych 4.077 s). Po remuxie `media::content_span()` czyta PTS pierwszej paczki i długość strumienia wideo, a `ffmpeg::trim_is_exact()` porównuje je z żądaniem (tolerancja ok. 2 klatki, min. 0.12 s). Jeśli cięcie nie trafiło, remux jest odrzucany i eksport idzie dokładną rekompresją — użytkownik dostaje wybrane sekundy. Kopiowanie całego klipu (`in = 0`, `out = duration`) tej weryfikacji nie potrzebuje.
+- **Scaling down to 720p** at 4.6 Mb/s: VMAF 86.2. The resolution loss costs more than the
+  extra bits gain. The plan already takes resolution into account.
+- **Dropping to 30 fps**: VMAF 56.6 (VMAF compares frame by frame) and visibly less smooth.
+- **Denoising before encoding** (`hqdn3d`): 92.9. It smooths textures and makes gameplay look
+  soft.
 
----
+One idea works but is deliberately not the default:
 
-## 6. Podgląd Zakresu (Preview trim)
+- **HEVC 10-bit** (`-profile:v main10 -pix_fmt p010le -highbitdepth 1`): 94.24 VMAF at
+  5.34 Mb/s versus 93.63 at 5.53 Mb/s for 8-bit. That is about +0.6 VMAF and a smaller file,
+  because 10-bit kills banding in skies, smoke and shadows. The cost is compatibility:
+  QuickTime, iOS and some social platforms are less reliable with it. It belongs behind a
+  "maximum quality" option, not in the default path.
 
-W GUI przycisk **Preview trim** odtwarza wyłącznie zakres IN–OUT z pliku źródłowego
-(bez ponownego kodowania), więc to, co widzisz w podglądzie, odpowiada dokładnie temu,
-co zostanie wyeksportowane. Plan jakości (bitrate, bppf, przewidywany rozmiar) jest
-przeliczany na żywo przy każdej zmianie profilu, limitu, kodeka, silnika lub zakresu.
+## NVENC rate control
 
----
+For `h264_nvenc`, `hevc_nvenc` and `av1_nvenc`, CutGut probes the best flag set the installed
+driver accepts and then uses VBR with a ceiling:
 
-## 7. Jak Uruchomić Eksport AV1
+- `-tune uhq` and `-preset p7` for high quality (the fallback sets omit what the driver
+  rejects).
+- `-multipass fullres` for a full-resolution analysis pass inside the hardware encoder. This
+  is not the same as a two-pass CPU encode.
+- `-b_ref_mode middle` for B-frame references.
+- `-spatial-aq 1` and `-temporal-aq 1` for adaptive quantization.
+- `-rc-lookahead 32` to see difficult scenes (smoke, particles, fire) before they arrive.
+- `-maxrate 1.5 × video_kbps` and `-bufsize 2 × video_kbps` so hard scenes can borrow bits
+  without turning the whole export into CBR.
 
-### W GUI (`CutGut.exe`):
-1. Uruchom `CutGut.exe` (lub `Uruchom_CutGut.bat`).
-2. Otwórz plik wideo (**Open video** / **Change video** lub przeciągnij i upuść).
-3. W panelu **Export**:
-   - **Codec** → **AV1**.
-   - **Engine** → **GPU – high quality** (karta RTX 40xx+) lub **CPU – high quality** (`libsvtav1`).
-   - **Limit** → np. 20 MB (Discord Free).
-4. Kliknij **Export**.
+Fast mode uses a lighter preset (`p3`) and skips the most expensive analysis flags. The
+quality difference is real; the speed difference is bigger.
 
-### W CLI (`cutgut.exe`):
+## Safe output and the correction loop
+
+### Never overwrite the source
+
+Before encoding, the input and output paths are canonicalized and compared. If the output
+would resolve to the input (including through a symlink or a hard link), the export is
+refused.
+
+### Write, verify, then replace
+
+The encoder writes to a temporary file in the destination directory
+(`.cg_tmp_{tag}_{name}`), so the final rename stays on the same volume. The existing output
+file is not touched during encoding. Only after the size check passes is the temporary file
+moved into place with `MoveFileExW(..., MOVEFILE_REPLACE_EXISTING)`. A failed export, a
+cancelled export or a permission error leaves the user's previous file intact.
+
+Temporary files are cleaned up per job, so a second CutGut instance cannot delete an encode
+that is still running.
+
+### When the file is still too large
+
+The file is accepted when its real size is at most 99.5% of the hard limit; the final attempt
+may use the full limit. If the first attempt overshoots, only the video budget is corrected,
+because audio and container overhead are effectively fixed:
+
+```text
+measured_video = max(actual_size - audio_bytes - overhead_bytes, 1000)
+target_video   = max(hard_limit_bytes × safety - audio_bytes - overhead_bytes, 1000)
+new_vkbps      = max(floor(current_vkbps × min(target_video / measured_video, 0.95)), 25)
+```
+
+The safety factor is 0.96 on the second attempt and 0.93 on the third. Each retry starts from
+the original source and keeps the same codec, preset and VBR settings. There are at most three
+attempts. If the file is still over the limit after that, the export fails with the measured
+size and the target in the error. A file over the limit is never reported as a success.
+
+## Remux instead of re-encode
+
+If the clip already fits and only the container or the stream copy needs to change, CutGut
+tries `-c copy` first. That is much faster and lossless, but it has two rules:
+
+- Remux is only allowed when the frame was not cropped (or the crop is `original`) and the
+  source codec matches the requested output codec. Asking for AV1 from an H.264 source must
+  re-encode.
+- A stream copy can only start at a keyframe. Cutting between keyframes used to produce a
+  file with extra seconds before the requested in-point (a 6–10 s cut could start at -1.835 s
+  and contain 5.9 s of video for a requested 4.077 s). After the remux, `content_span()` reads
+  the first video PTS and the stream duration, and `trim_is_exact()` compares them with the
+  request (about two frames or 0.12 s of tolerance). If the cut missed, the remux is thrown
+  away and the export does an exact re-encode. A full-clip copy (`in = 0`, `out = duration`)
+  does not need this check.
+
+## Preview trim
+
+The **Preview trim** button in the editor plays only the IN–OUT range from the source file,
+without re-encoding. The quality panel (bitrate, bits per pixel per frame, predicted size) is
+recomputed on every change of profile, limit, codec, engine or range.
+
+## Exporting AV1
+
+In the GUI:
+
+1. Open a clip in the editor.
+2. In the **Export** panel choose **Codec → AV1**.
+3. Choose **Engine → GPU – high quality** (RTX 40 series or newer) or **CPU – high quality**
+   (`libsvtav1`).
+4. Set the limit to 20 MB for Discord's free upload.
+5. Press **Export**.
+
+In the CLI:
+
 ```bat
-:: Eksport klipu z kodekiem AV1 i limitem 20 MB
-cutgut encode "film.mp4" --out out.mp4 --start 10 --end 30 --target 20 --codec av1 --speed hq
-
-:: Analiza planu bitrate i gęstości bitowej AV1 przed kodowaniem
-cutgut plan "film.mp4" --target 20 --codec av1
-
-:: Wymuszenie enkodera CPU (libsvtav1)
-cutgut encode "film.mp4" --out out.mp4 --target 20 --codec av1 --cpu
+cutgut encode "clip.mp4" --out out.mp4 --start 10 --end 30 --target 20 --codec av1 --speed hq
+cutgut plan "clip.mp4" --target 20 --codec av1
+cutgut encode "clip.mp4" --out out.mp4 --target 20 --codec av1 --cpu
 ```

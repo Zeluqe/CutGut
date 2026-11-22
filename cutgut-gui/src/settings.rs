@@ -119,7 +119,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             version: 2,
-            lang: Lang::Pl,
+            lang: Lang::En,
             dark_theme: true,
             background_theme: String::new(),
             output_dir: cutgut::media::get_default_output_dir()

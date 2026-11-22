@@ -29,7 +29,7 @@ Opcje wspólne:
   --speed <s>      hq | fast | balanced (domyślnie hq)
   --cpu / --gpu    Wymuś enkoder programowy / sprzętowy
   --crop <ratio>   original | 16:9 | 9:16 | 1:1
-  --lang <pl|en>   Język komunikatów (domyślnie pl)
+  --lang <pl|en>   Język komunikatów (domyślnie en)
   --quiet          Bez paska postępu
 
 Przykłady:
@@ -63,7 +63,7 @@ Common options:
   --speed <s>      hq | fast | balanced (default hq)
   --cpu / --gpu    Force software / hardware encoder
   --crop <ratio>   original | 16:9 | 9:16 | 1:1
-  --lang <pl|en>   Message language (default pl)
+  --lang <pl|en>   Message language (default en)
   --quiet          No progress bar
 
 Examples:

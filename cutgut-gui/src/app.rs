@@ -522,6 +522,24 @@ impl CutGutApp {
         self.toast = Some((t(self.lang, "video_unloaded").to_string(), Instant::now()));
     }
 
+    /// Shows the exact frame for the current position.
+    ///
+    /// `request_frame` prefers the memory cache, which is what makes dragging
+    /// instant — but a cached frame can be up to half a cache interval (a fifth
+    /// of a second) away, and on a one-frame step that reads as "the wrong
+    /// picture loads first, then the right one". Stepping therefore asks the
+    /// still decoder straight away and leaves the current picture up until it
+    /// lands, exactly like the gallery preview does.
+    fn request_exact_frame(&mut self) {
+        let Some(video) = &self.video else { return };
+        let last_frame = (video.info.duration - 1.0 / video.info.fps.max(1.0)).max(0.0);
+        let time = self.position.min(last_frame).max(0.0);
+        self.last_frame_request = Some((Instant::now(), time));
+        self.preview_cached = None;
+        self.still
+            .request(&video.path, time, PreviewSize::still(&video.info));
+    }
+
     fn request_frame(&mut self, immediate: bool) {
         let Some(video) = &self.video else { return };
         let last_frame = (video.info.duration - 1.0 / video.info.fps.max(1.0)).max(0.0);
@@ -1292,7 +1310,7 @@ impl CutGutApp {
             return;
         }
         self.position = time;
-        self.request_frame(true);
+        self.request_exact_frame();
     }
 }
 

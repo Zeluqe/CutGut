@@ -1,38 +1,38 @@
-# CutGut — silnik (Rust)
+# CutGut engine (Rust)
 
-Ten katalog zawiera natywny silnik CutGut: wykrywanie strumieni, planowanie bitrate'u,
-kodowanie FFmpeg (H.264 / HEVC / AV1), 2-pass, remux, retry, eksport audio, miniatury,
-filmstrip, skanowanie galerii, polityki usuwania źródła — plus CLI.
+This crate is the engine behind CutGut: stream probing, bitrate planning, FFmpeg encoding
+(H.264 / HEVC / AV1), two-pass, remux, retries, audio export, thumbnails, filmstrips, gallery
+scanning and cleanup. The native UI lives in [`../cutgut-gui/`](../cutgut-gui/).
 
-| Część | Zakres |
-|---|---|
-| **Silnik** | probe, plan, twarde limity rozmiaru, FFmpeg encode, 2-pass, remux, retry, audio, miniatury, galeria, cleanup |
-| **GUI** | natywne okno egui: edytor, galeria, ustawienia (w `../cutgut-gui/`) |
+| Part | Scope |
+| --- | --- |
+| Engine | probe, plan, hard size limits, FFmpeg encode, 2-pass, remux, retry, audio, thumbnails, gallery, cleanup |
+| GUI | native egui window: editor, gallery, settings (in `../cutgut-gui/`) |
 
-## Szybki start (Windows)
+## Quick start (Windows)
 
-GUI buduje się osobno — instrukcja jest w głównym
-[README](../README.md#building-from-source). Sam silnik wystarczy do CLI:
-
-```bat
-cargo build --release
-target\release\cutgut.exe --help
-```
-
-Wymaganie: FFmpeg (`ffmpeg.exe`, `ffprobe.exe`) w `PATH` lub obok pliku exe.
-
-## Budowanie
-
-Silnik ma **zero zależności zewnętrznych** i buduje się offline:
+The GUI is built separately; see the main [README](../README.md#building-from-source). The
+engine alone is enough for the CLI:
 
 ```bat
 cargo build --release
 target\release\cutgut.exe --help
 ```
 
-Rozmiar/start (release, Windows): **~0,5 MB**, `--help` w **~0,15 s**.
+Requirement: FFmpeg (`ffmpeg.exe`, `ffprobe.exe`) in `PATH` or next to the executable.
 
-## Użycie CLI
+## Building
+
+The engine has **no third-party Rust dependencies** and builds offline:
+
+```bat
+cargo build --release
+target\release\cutgut.exe --help
+```
+
+Release size/startup on Windows: **~0.5 MB**, `--help` in **~0.15 s**.
+
+## CLI
 
 ```bat
 cutgut probe clip.mp4
@@ -46,26 +46,25 @@ cutgut gallery "%USERPROFILE%\Videos\NVIDIA"
 cutgut cleanup in.mp4 out.mp4 --policy trash
 ```
 
-Wspólne opcje: `--start`, `--end`, `--target` (MB), `--codec h264|hevc|av1`,
+Common options: `--start`, `--end`, `--target` (MB), `--codec h264|hevc|av1`,
 `--speed hq|fast|balanced`, `--cpu` / `--gpu`, `--crop original|16:9|9:16|1:1`,
-`--lang pl|en`, `--quiet`.
+`--lang pl|en` (default `en`), `--quiet`.
 
-## Moduły
+## Modules
 
 - `src/plan.rs` — `VideoInfo`, `CropBox`, `Plan`, `QualityAssessment`
 - `src/ffmpeg.rs` — `CancellationToken`, `ProgressUpdate`, `encode_video`, `encode_audio`
 - `src/media.rs` — `probe_video`, `generate_thumbnail`, `generate_filmstrip`,
-  `scan_gallery`, nazewnictwo plików wyjściowych
+  `scan_gallery`, output naming
 - `src/main.rs` — CLI (`probe`, `engines`, `plan`, `encode`, `audio`, `thumb`,
-  `filmstrip`, `gallery`, `cleanup`, interaktywne menu bez argumentów)
+  `filmstrip`, `gallery`, `cleanup`, and the interactive menu when run without arguments)
 
-## Zachowanie silnika
+## Engine behavior
 
-- Twardy limit = `target_mb × 1 000 000` bajtów, weryfikowany po zakodowaniu.
-- AV1 planuje z zapasem **94%** limitu (SVT-AV1/NVENC AV1 potrafi przestrzelić VBR),
-  pozostałe kodeki 96%.
-- Remux (`-c copy`) gdy plik już się mieści i nie wymaga kadrowania.
-- Do 3 prób, każda liczona od pliku źródłowego, z zachowaniem wybranego kodeka.
-- Wykrywanie enkoderów realnym testem 1 klatki (NVENC, AMF, CPU), z fallbackiem.
+- Hard limit = `target_mb × 1,000,000` bytes, verified after encoding.
+- AV1 plans to 94% of the limit (SVT-AV1 / NVENC AV1 VBR can overshoot); other codecs use 96%.
+- Remux (`-c copy`) when the clip already fits and does not need cropping.
+- Up to three attempts, each starting from the source, with the same codec.
+- Hardware encoder detection by a real one-frame encode (NVENC, AMF, CPU), with fallback.
 
-Szczegóły: [`../docs/EXPORT_QUALITY_AND_HARD_LIMIT.md`](../docs/EXPORT_QUALITY_AND_HARD_LIMIT.md).
+Details: [`../docs/EXPORT_QUALITY_AND_HARD_LIMIT.md`](../docs/EXPORT_QUALITY_AND_HARD_LIMIT.md).

@@ -6,12 +6,16 @@
 
 [English version](README.md)
 
-CutGut bierze pełne nagranie z gry i oddaje klip w rozmiarze, który wybrałeś. Wytnij fragment,
-przytnij go pod pion albo kwadrat, ustaw 20 MB, 50 MB albo 500 MB, a program policzy bitrate,
-zakoduje plik i sprawdzi wynik. Jeśli plik wyjdzie ponad limit, plan jest liczony jeszcze raz —
-zamiast cichego oddania pliku, którego Discord nie przyjmie.
+CutGut jest zrobiony pod nagrywarkę wbudowaną w NVIDIA. NVIDIA zapisuje każdy mecz do
+`Videos\NVIDIA` z datą i godziną w nazwie; CutGut otwiera ten folder, grupuje klipy po grach
+i pokazuje ten, który pamiętasz, zamiast kazać szukać go w Eksploratorze. Wytnij fragment,
+przytnij go pod pion albo kwadrat, ustaw darmowy limit 20 MB na Discord i wyślij klip
+znajomym.
 
-Zrobiłem to dla swoich nagrań z NVIDIA. Chciałem pozbyć się jednego schematu: otwórz konwerter,
+Pod spodem program liczy bitrate, koduje przez FFmpeg, mierzy gotowy plik i ponawia plan,
+jeśli wynik przekroczy limit. Nie opiera się na „około 20 MB”.
+
+Zrobiłem to dla swoich klipów. Chciałem pozbyć się jednego schematu: otwórz konwerter,
 zgadnij bitrate, eksportuj, sprawdź rozmiar, eksportuj ponownie. CutGut to ten sam schemat,
 tylko w jednym oknie.
 
@@ -53,7 +57,7 @@ wchodzi do edytora od razu.
 <details>
 <summary>Więcej zrzutów</summary>
 
-![Kadrowanie](docs/screenshots/crop.png)
+![Panel eksportu](docs/screenshots/export.png)
 
 ![Ustawienia](docs/screenshots/settings.png)
 
@@ -132,7 +136,8 @@ poprosiłby NVENC o gigabit na sekundę. Po kodowaniu plik jest mierzony i w raz
 całość leci ponownie z poprawionym planem.
 
 Pełny opis, razem z pomiarami VMAF dla AV1/HEVC/H.264 i uzasadnieniem 4% zapasu, jest w
-[docs/EXPORT_QUALITY_AND_HARD_LIMIT.md](docs/EXPORT_QUALITY_AND_HARD_LIMIT.md).
+[docs/EXPORT_QUALITY_AND_HARD_LIMIT.md](docs/EXPORT_QUALITY_AND_HARD_LIMIT.md). Wersja polska:
+[docs/EXPORT_QUALITY_AND_HARD_LIMIT.pl.md](docs/EXPORT_QUALITY_AND_HARD_LIMIT.pl.md).
 
 ## Znane ograniczenia
 
@@ -141,9 +146,9 @@ Pełny opis, razem z pomiarami VMAF dla AV1/HEVC/H.264 i uzasadnieniem 4% zapasu
 - Brak instalatora i auto-update'u. Aktualizacja to podmiana pliku exe.
 - Pliki exe nie są podpisane, więc Windows SmartScreen zapyta o potwierdzenie przy pierwszym
   uruchomieniu.
-- Interfejs jest po polsku i angielsku; dokumentacja techniczna na razie tylko po polsku.
+- Interfejs i dokumentacja są po angielsku i polsku; domyślnie włącza się angielski.
 - Pierwsze skanowanie dużej galerii trochę trwa, bo każda miniatura jest generowana. Kolejne
-  uruchomienia korzystają z cache w `%APPDATA%\CutGut`.
+  uruchomienia korzystają z cache miniatur w `temp\gallery_cache` obok pliku exe.
 - AV1 na CPU jest wolne. Przy ciasnym limicie daje najlepszy wynik, ale dwuminutowy klip może
   kodować się kilka minut.
 

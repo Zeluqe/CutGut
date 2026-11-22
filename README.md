@@ -6,13 +6,17 @@
 
 [Polska wersja](README.pl.md)
 
-CutGut takes a full gameplay recording and gives you the clip back at a size you picked.
-Trim it, crop it for vertical or square, choose 20 MB, 50 MB or 500 MB, and it works out
-the bitrate, encodes the file and checks the result. If the output lands over the limit, it
-re-plans and tries again instead of quietly handing you a file that Discord will reject.
+CutGut is a Windows app built around NVIDIA's built-in recordings. NVIDIA writes every match
+into `Videos\NVIDIA` with a timestamp for a name; CutGut opens that folder, groups the clips
+by game and puts the one you remember in front of you instead of making you dig through
+Explorer. Trim it, crop it, choose Discord's free 20 MB limit, and the export lands under
+that limit — ready to send to friends.
 
-I built it for my own NVIDIA replays. The loop I wanted to get rid of was: open a converter,
-guess a bitrate, export, check the size, export again. CutGut is that loop in one window.
+Under the hood it calculates the bitrate, encodes with FFmpeg, checks the result and re-plans
+if the file overshoots. It does not rely on "roughly 20 MB".
+
+I built it for my own clips. The loop I wanted to get rid of was: open a converter, guess a
+bitrate, export, check the size, export again. CutGut is that loop in one window.
 
 ![CutGut editor](docs/screenshots/editor.png)
 
@@ -50,7 +54,7 @@ CutGut* opens the editor immediately instead of animating back to the grid first
 <details>
 <summary>More screenshots</summary>
 
-![Crop overlay](docs/screenshots/crop.png)
+![Export panel](docs/screenshots/export.png)
 
 ![Settings](docs/screenshots/settings.png)
 
@@ -129,7 +133,8 @@ is measured and the whole thing is retried with a corrected plan if needed.
 
 The full write-up, including measured VMAF numbers for AV1/HEVC/H.264 and the reasoning
 behind the 4% safety margin, is in
-[docs/EXPORT_QUALITY_AND_HARD_LIMIT.md](docs/EXPORT_QUALITY_AND_HARD_LIMIT.md) (Polish).
+[docs/EXPORT_QUALITY_AND_HARD_LIMIT.md](docs/EXPORT_QUALITY_AND_HARD_LIMIT.md). Polish version:
+[docs/EXPORT_QUALITY_AND_HARD_LIMIT.pl.md](docs/EXPORT_QUALITY_AND_HARD_LIMIT.pl.md).
 
 ## Known limitations
 
@@ -138,9 +143,9 @@ behind the 4% safety margin, is in
 - No installer and no auto-update. Updating means replacing the executable.
 - The executables are not code-signed, so Windows SmartScreen will ask for confirmation the
   first time you run them.
-- The interface is Polish and English; the technical documentation is Polish only for now.
+- The interface and documentation are available in English and Polish; English is the default.
 - The first scan of a large gallery takes a while because every thumbnail is generated. Later
-  runs use the cache in `%APPDATA%\CutGut`.
+  runs use the thumbnail cache in `temp\gallery_cache` next to the executable.
 - AV1 on CPU is slow. It is the best option for a tight size limit, but a two-minute clip can
   take a few minutes to encode.
 

@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicU8, Ordering};
 const PL: u8 = 0;
 const EN: u8 = 1;
 
-static LANG: AtomicU8 = AtomicU8::new(PL);
+static LANG: AtomicU8 = AtomicU8::new(EN);
 
 /// Switches the active language. Unknown codes fall back to English.
 pub fn set_lang(code: &str) {

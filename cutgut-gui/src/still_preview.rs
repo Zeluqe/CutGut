@@ -92,6 +92,13 @@ impl StillPreview {
     pub fn poll(&mut self) -> Option<ColorImage> {
         let mut state = self.queue.0.lock().unwrap();
         let (generation, image) = state.completed.take()?;
+        // Frame stepping asks for a picture every 16 ms of clip time, so a decode
+        // that was already under way when the next key arrived must not win: it
+        // would flash the frame the user just stepped away from.
+        if generation < state.generation {
+            self.pending = true;
+            return None;
+        }
         self.pending = generation != state.generation;
         image
     }
@@ -103,5 +110,40 @@ impl Drop for StillPreview {
         let (lock, wake) = &*self.queue;
         lock.lock().unwrap().closed = true;
         wake.notify_one();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use eframe::egui::Color32;
+
+    fn result(generation: u64) -> (u64, Option<ColorImage>) {
+        (
+            generation,
+            Some(ColorImage::new([1, 1], vec![Color32::BLACK])),
+        )
+    }
+
+    /// Stepping asks for a new frame every few milliseconds of clip time. A
+    /// decode that was already running when the next key arrived must not be
+    /// shown: it would flash the frame the user just stepped away from.
+    #[test]
+    fn a_superseded_decode_is_dropped_instead_of_shown() {
+        let mut preview = StillPreview::new(Context::default());
+        {
+            let mut state = preview.queue.0.lock().unwrap();
+            state.generation = 7;
+            state.completed = Some(result(6));
+        }
+        assert!(preview.poll().is_none(), "an older frame must not appear");
+        assert!(preview.pending, "the newer frame is still on its way");
+
+        {
+            let mut state = preview.queue.0.lock().unwrap();
+            state.completed = Some(result(7));
+        }
+        assert!(preview.poll().is_some(), "the newest frame is shown");
+        assert!(!preview.pending);
     }
 }
