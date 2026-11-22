@@ -66,8 +66,8 @@ CutGut* opens the editor immediately instead of animating back to the grid first
 
 ## Running
 
-There is no installer. A release is just the executables from that tag: `CutGut.exe` for the
-app and `cutgut.exe` for the CLI. Download the
+There is no installer. A release contains `CutGut.exe` for the app and `cutgut-cli.zip` with
+the CLI (`cutgut.exe`). Download the
 [latest release](https://github.com/Zeluqe/CutGut/releases/latest), or build it below.
 
 1. Put `ffmpeg.exe` and `ffprobe.exe` in `PATH`, or next to `CutGut.exe`.

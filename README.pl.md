@@ -69,8 +69,8 @@ wchodzi do edytora od razu.
 
 ## Uruchomienie
 
-Nie ma instalatora. Wydanie to po prostu pliki wykonywalne z danego tagu: `CutGut.exe` dla
-aplikacji i `cutgut.exe` dla CLI. Pobierz
+Nie ma instalatora. Wydanie zawiera `CutGut.exe` dla aplikacji oraz `cutgut-cli.zip` z CLI
+(`cutgut.exe`). Pobierz
 [najnowsze wydanie](https://github.com/Zeluqe/CutGut/releases/latest) albo zbuduj całość
 ze źródeł (poniżej).
 
